@@ -149,6 +149,7 @@ select {
   padding: 9px 10px;
 }
 
+/* Fixed: use >, not &gt; */
 .filter-list > span {
   color: #475467;
   font-size: 0.82rem;
@@ -279,53 +280,116 @@ select {
   }
 }
 
+/* =========================
+   Legend
+   ========================= */
+
 .legend {
-  align-items: center;
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  z-index: 700;
+
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 28px;
+
+  max-width: calc(100% - 36px);
+  padding: 12px 14px;
+
   background: rgba(255, 255, 255, 0.94);
   border: 1px solid #d7dee9;
   border-radius: 8px;
-  bottom: 18px;
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  left: 18px;
-  max-width: calc(100% - 36px);
-  padding: 10px 12px;
-  position: absolute;
-  z-index: 500;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.14);
+
+  color: #172033;
 }
 
-.legend span {
-  align-items: center;
+.legend-section {
   display: flex;
-  font-size: 0.83rem;
+  flex-direction: column;
+  align-items: flex-start;
   gap: 6px;
+}
+
+.legend-title {
+  display: block;
+  margin: 0 0 2px 0;
+  padding: 0;
+  color: #475467;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  color: #172033;
+  font-size: 12px;
+  line-height: 1.2;
   white-space: nowrap;
 }
 
 .legend i {
-  border-radius: 3px;
-  display: inline-block;
-  height: 12px;
   width: 12px;
+  height: 12px;
+  display: inline-block;
+  flex-shrink: 0;
+  border: 1px solid transparent;
 }
 
+/* Mesh / score legend icon */
+.legend .legend-square {
+  border-radius: 3px;
+}
+
+/* Hospital legend icon */
+.legend .legend-circle {
+  border-radius: 50% !important;
+  border-width: 2px;
+  border-style: solid;
+}
+
+/* Optional transport icon */
+.legend .transport {
+  border-radius: 50%;
+  background: #2dd4bf;
+  border-color: #0f766e;
+}
+
+/* Optional medical icon */
+.legend .medical {
+  border-radius: 50%;
+  background: #ef4444;
+  border-color: #7f1d1d;
+}
+
+/* Optional old candidate/elderly classes */
 .legend .candidate {
+  border-radius: 3px;
   background: #dc2626;
 }
 
 .legend .elderly {
-  background: #f59e0b;
+  border-radius: 3px;
+  background: #b91c1c;
 }
 
-.legend .transport {
-  background: #2dd4bf;
-}
-
-.legend .medical {
-  background: #ef4444;
-}
+/* =========================
+   Popup
+   ========================= */
 
 .map-popup {
   min-width: 230px;
@@ -353,6 +417,10 @@ select {
   text-align: right;
 }
 
+/* =========================
+   Responsive
+   ========================= */
+
 @media (max-width: 820px) {
   .dashboard {
     grid-template-columns: 1fr;
@@ -368,5 +436,12 @@ select {
 
   .map-shell {
     grid-row: 1;
+  }
+
+  .legend {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    max-width: none;
   }
 }
