@@ -204,9 +204,9 @@ function isCandidate(properties, controls) {
       (trainDistance === null || trainDistance > controls.trainRadiusM);
 
   return (
-    elderlyRate >= controls.elderlyRateThreshold &&
-    outsideMedical &&
-    outsidePublic &&
+    // elderlyRate >= controls.elderlyRateThreshold &&
+    // outsideMedical &&
+    // outsidePublic &&
     (
       (controls.scoreThreshold===2 && (score === 1 || score === 2) ) || 
       (controls.scoreThreshold ===  score)
