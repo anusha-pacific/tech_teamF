@@ -1,0 +1,21 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.env
+
+# Node
+node_modules/
+dist/
+
+# OS/editor
+.DS_Store
+.vscode/
+
+# Large/local data
+data/raw/
+data/private/
+*.gpkg
+*.shp
+*.db
+*.sqlite

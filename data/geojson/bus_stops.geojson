@@ -1,0 +1,17 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "stop_id": "bus-001",
+        "stop_name": "Sample Bus Stop",
+        "type": "bus"
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [139.7605, 35.678]
+      }
+    }
+  ]
+}
