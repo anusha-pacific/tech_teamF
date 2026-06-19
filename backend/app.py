@@ -13,9 +13,20 @@ DATA_DIR = APP_DIR / "data" if (APP_DIR / "data").exists() else APP_DIR.parent /
 GEOJSON_DIR = DATA_DIR / "geojson"
 GTFS_DIR = DATA_DIR / "gtfs"
 PREFERRED_MESH_FILES = [
-    GEOJSON_DIR / "mesh_hospital_nearest_wide.geojson",
+    # GEOJSON_DIR / "mesh_hospital_nearest_wide.geojson",
+    GEOJSON_DIR / "mesh_hospital_nearest_wide_poly.geojson",
     GEOJSON_DIR / "mesh_population.geojson",
 ]
+
+
+import json
+
+with open("mesh_hospital_nearest_wide_poly.geojson", encoding="utf-8") as f:
+    geojson = json.load(f)
+
+print(geojson["features"][0]["geometry"]["type"])
+print(geojson["features"][0])
+
 
 app = Flask(__name__)
 CORS(app)
@@ -24,6 +35,7 @@ CORS(app)
 def mesh_path():
     for path in PREFERRED_MESH_FILES:
         if path.exists():
+            print("returning ",path)
             return path
     return PREFERRED_MESH_FILES[-1]
 

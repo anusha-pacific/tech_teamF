@@ -11,8 +11,8 @@ const initialControls = {
   colorMode: "elderly",
   showMesh: true,
   showHospitals: true,
-  showStations: true,
-  showBusStops: true,
+  showStations: false,
+  showBusStops: false,
   showMedicalBuffers: false,
   showTransportBuffers: false,
   showCandidates: true,
@@ -36,6 +36,7 @@ const TOYAMA_VIEW = {
 };
 
 const MESH_EQUAL_AREA_RADIUS_M = Math.sqrt((500 * 500) / Math.PI);
+const HOSPITAL_MARKER_RADIUS_M = Math.sqrt((500 * 500) / Math.PI);
 
 const messages = {
   en: {
@@ -79,7 +80,7 @@ const messages = {
     busRadius: "Bus radius",
     analysis: "Analysis",
     highlightCandidates: "Highlight access difficulty candidates",
-    scoreThreshold: "Score threshold",
+    scoreThreshold: "Access Difficulty Filter",
     candidateMeshes: "Candidate meshes",
     loadingLayers: "Loading layers...",
     loadingDetail: "Reading GeoJSON and preparing map layers",
@@ -136,7 +137,7 @@ const messages = {
     busRadius: "バス半径",
     analysis: "分析",
     highlightCandidates: "医療アクセス困難候補を強調",
-    scoreThreshold: "スコアしきい値",
+    scoreThreshold: "アクセス困難度絞る",
     candidateMeshes: "候補メッシュ",
     loadingLayers: "レイヤーを読み込み中...",
     loadingDetail: "GeoJSONを読み込み、地図レイヤーを準備しています",
@@ -149,6 +150,41 @@ const messages = {
     transport: "公共交通",
   },
 };
+
+const HOSPITAL_TYPE_STYLES = {
+  "1": {
+    color: "#2563eb",
+    fillColor: "#60a5fa",
+    label: "Primary hospital",
+  },
+  "2": {
+    color: "#16a34a",
+    fillColor: "#86efac",
+    label: "Secondary hospital",
+  },
+  "2.5": {
+    color: "#f59e0b",
+    fillColor: "#fde68a",
+    label: "2.5-level hospital",
+  },
+  "3": {
+    color: "#7f1d1d",
+    fillColor: "#ef4444",
+    label: "Tertiary hospital",
+  },
+};
+
+function getHospitalTypeStyle(properties) {
+  const type = String(properties?.P04_001 ?? "").trim();
+
+  return (
+    HOSPITAL_TYPE_STYLES[type] || {
+      color: "#6b7280",
+      fillColor: "#d1d5db",
+      label: "Unknown hospital type",
+    }
+  );
+}
 
 function createTranslator(language) {
   return (key) => messages[language]?.[key] || messages.en[key] || key;
@@ -190,6 +226,13 @@ function getScore(properties) {
   return score_elderly + score_transport + score_kourei;
 }
 
+function matchScore(score,control_score_thresh){
+  return ( (control_score_thresh===-1) ||
+      (control_score_thresh===2 && (score === 1 || score === 2) ) || 
+      (control_score_thresh ===  score)
+    )
+}
+
 function isCandidate(properties, controls) {
   const elderlyRate = Number(properties?.elderly_rate) || 0;
   const score = getScore(properties);
@@ -202,20 +245,68 @@ function isCandidate(properties, controls) {
     ? Math.min(busDistance ?? Infinity, trainDistance ?? Infinity) > controls.publicTransportRadiusM
     : (busDistance === null || busDistance > controls.busRadiusM) &&
       (trainDistance === null || trainDistance > controls.trainRadiusM);
+      // console.log(controls.scoreThreshold,controls.scoreThreshold===-1)
 
   return (
     // elderlyRate >= controls.elderlyRateThreshold &&
     // outsideMedical &&
     // outsidePublic &&
-    (
-      (controls.scoreThreshold===2 && (score === 1 || score === 2) ) || 
-      (controls.scoreThreshold ===  score)
-    )
+    matchScore(score, controls.scoreThreshold)
+    // ( (controls.scoreThreshold===-1) ||
+    //   (controls.scoreThreshold===2 && (score === 1 || score === 2) ) || 
+    //   (controls.scoreThreshold ===  score)
+    // )
   );
 }
 
+const SCORE_COLOR_RULES = [
+  { score: 4, color: "#dc2626", label: "最優先対応地域" },
+  { score: 3, color: "#e68416", label: "優先対応地域" },
+  { score: 2, color: "#ece912", label: "" },
+  { score: 1, color: "#ece912", label: "要観察地域" },
+  { score: 0, color: "#33e90f", label: "アクセス良好地域" },
+];
+
+const ELDERLY_COLOR_RULES = [
+  { color: "#7f1d1d", label: "65+ rate ≥ 45%" },
+  { color: "#b91c1c", label: "65+ rate ≥ 35%" },
+  { color: "#f59e0b", label: "65+ rate ≥ 25%" },
+  { color: "#fde68a", label: "65+ rate > 0%" },
+  { color: "#f3f4f6", label: "No elderly data" },
+];
+
+const POPULATION_COLOR_RULES = [
+  { color: "#7c2d12", label: "Population > 800" },
+  { color: "#c2410c", label: "Population > 500" },
+  { color: "#f97316", label: "Population > 250" },
+  { color: "#fdba74", label: "Population > 0" },
+  { color: "#f3f4f6", label: "No population" },
+];
+
+function matchColorScore(actualScore, targetScore) {
+  return Number(actualScore) === Number(targetScore);
+}
+
+function getScoreColor(score) {
+  return SCORE_COLOR_RULES.find((rule) => matchColorScore(score, rule.score))?.color || "#26c1dc";
+}
+
+function getMeshLegendItems(controls) {
+  if (controls.showCandidates) {
+    return SCORE_COLOR_RULES;
+  }
+
+  if (controls.colorMode === "population") {
+    return POPULATION_COLOR_RULES;
+  }
+
+  return ELDERLY_COLOR_RULES;
+}
+
 function meshColor(properties, controls) {
-  if (controls.showCandidates && isCandidate(properties, controls)) return "#dc2626";
+  if (controls.showCandidates) {
+    return getScoreColor(getScore(properties));
+  }
 
   if (controls.colorMode === "population") {
     const population = Number(properties?.population) || 0;
@@ -366,11 +457,11 @@ function App() {
     mapRef.current = map;
 
     [
-      ["bufferPane", 390],
-      ["meshPane", 430],
+      ["bufferPane", 540],
+      ["meshPane", 520],
       ["stopPane", 500],
-      ["stationPane", 520],
-      ["medicalPane", 540],
+      ["medicalPane", 480],
+      ["stationPane", 450],
     ].forEach(([name, zIndex]) => {
       map.createPane(name);
       map.getPane(name).style.zIndex = zIndex;
@@ -400,6 +491,8 @@ function App() {
 
         if (mounted) {
           setData({ mesh, hospitals, stations, busStops });
+          // console.log(mesh.features[0].geometry.type);
+          // console.log(mesh.features[0].geometry);
           setError("");
         }
       } catch (loadError) {
@@ -410,6 +503,8 @@ function App() {
     }
 
     loadData();
+    
+
     return () => {
       mounted = false;
     };
@@ -427,6 +522,10 @@ function App() {
   const candidateCount = useMemo(() => {
     return data.mesh?.features?.filter((feature) => isCandidate(feature.properties, appliedControls)).length || 0;
   }, [data.mesh, appliedControls]);
+
+  const meshLegendItems = useMemo(() => {
+    return getMeshLegendItems(appliedControls);
+  }, [appliedControls]);
 
   const stopModeOptions = useMemo(() => {
     const modes = new Set();
@@ -454,55 +553,87 @@ function App() {
       layersRef.current = {};
       bufferRef.current = {};
 
+      // if (appliedControls.showMesh) {
+      //   const scoreFilteredMesh = {
+      //     ...data.mesh,
+      //     features: data.mesh.features.filter(
+      //       (feature) => getScore(feature.properties) === appliedControls.scoreThreshold
+      //     ),
+      //   };
+
+      //   layersRef.current.mesh = L.geoJSON(scoreFilteredMesh, {
+      //   // if (appliedControls.showMesh) {
+      //   //   layersRef.current.mesh = L.geoJSON(data.mesh, {
+      //     pointToLayer: (feature, latlng) => {
+      //       const candidate = isCandidate(feature.properties, appliedControls);
+      //       return L.circle(latlng, {
+      //         pane: "meshPane",
+      //         radius: MESH_EQUAL_AREA_RADIUS_M,
+      //         color: candidate ? "#991b1b" : "#374151",
+      //         fillColor: meshColor(feature.properties, appliedControls),
+      //         fillOpacity: (appliedControls.meshOpacity / 100) * (candidate ? 1 : 0.86),
+      //         opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
+      //         weight: candidate ? 2 : 1,
+      //       });
+      //     },
+      //     style: (feature) => ({
+      //       color: isCandidate(feature.properties, appliedControls) ? "#991b1b" : "#374151",
+      //       fillColor: meshColor(feature.properties, appliedControls),
+      //       fillOpacity: appliedControls.meshOpacity / 100,
+      //       opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
+      //       weight: isCandidate(feature.properties, appliedControls) ? 2 : 1,
+      //       pane: "meshPane",
+      //     }),
+      //     onEachFeature: (feature, layer) => layer.bindPopup(() => meshPopup(feature, appliedControls)),
+      //   }).addTo(map);
+      // }
       if (appliedControls.showMesh) {
         const scoreFilteredMesh = {
           ...data.mesh,
           features: data.mesh.features.filter(
-            (feature) => getScore(feature.properties) === appliedControls.scoreThreshold
+            // (feature) => getScore(feature.properties) === appliedControls.scoreThreshold
+            (feature) => matchScore(getScore(feature.properties), appliedControls.scoreThreshold) 
           ),
         };
 
         layersRef.current.mesh = L.geoJSON(scoreFilteredMesh, {
-      // if (appliedControls.showMesh) {
-      //   layersRef.current.mesh = L.geoJSON(data.mesh, {
-          pointToLayer: (feature, latlng) => {
+          style: (feature) => {
             const candidate = isCandidate(feature.properties, appliedControls);
-            return L.circle(latlng, {
+
+            return {
               pane: "meshPane",
-              radius: MESH_EQUAL_AREA_RADIUS_M,
               color: candidate ? "#991b1b" : "#374151",
               fillColor: meshColor(feature.properties, appliedControls),
-              fillOpacity: (appliedControls.meshOpacity / 100) * (candidate ? 1 : 0.86),
+              fillOpacity: appliedControls.meshOpacity / 100,
               opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
               weight: candidate ? 2 : 1,
-            });
+            };
           },
-          style: (feature) => ({
-            color: isCandidate(feature.properties, appliedControls) ? "#991b1b" : "#374151",
-            fillColor: meshColor(feature.properties, appliedControls),
-            fillOpacity: appliedControls.meshOpacity / 100,
-            opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
-            weight: isCandidate(feature.properties, appliedControls) ? 2 : 1,
-            pane: "meshPane",
-          }),
-          onEachFeature: (feature, layer) => layer.bindPopup(() => meshPopup(feature, appliedControls)),
+          onEachFeature: (feature, layer) =>
+            layer.bindPopup(() => meshPopup(feature, appliedControls)),
         }).addTo(map);
       }
+
+      
       
 
       if (appliedControls.showHospitals && data.hospitals) {
         layersRef.current.hospitals = L.geoJSON(data.hospitals, {
-          pointToLayer: (feature, latlng) =>
-            L.circleMarker(latlng, {
+          pointToLayer: (feature, latlng) => {
+            const hospitalStyle = getHospitalTypeStyle(feature.properties);
+
+            return L.circle(latlng, {
               pane: "medicalPane",
-              radius: 6,
-              color: "#7f1d1d",
-              fillColor: "#ef4444",
+              radius: HOSPITAL_MARKER_RADIUS_M/2,
+              color: hospitalStyle.color,
+              fillColor: hospitalStyle.fillColor,
               fillOpacity: appliedControls.pointOpacity / 100,
               opacity: Math.min(1, appliedControls.pointOpacity / 100 + 0.12),
               weight: 2,
-            }),
-          onEachFeature: (feature, layer) => layer.bindPopup(() => pointPopup(feature, "Medical facility")),
+            });
+          },
+          onEachFeature: (feature, layer) =>
+            layer.bindPopup(() => pointPopup(feature, "Medical facility")),
         }).addTo(map);
       }
 
@@ -550,7 +681,7 @@ function App() {
               color: "#dc2626",
               fillColor: "#fecaca",
               fillOpacity: appliedControls.bufferOpacity / 100,
-              opacity: Math.min(1, appliedControls.bufferOpacity / 100 + 0.18),
+              opacity: Math.min(1, 0.3),//appliedControls.bufferOpacity / 100 + 0.18),
               weight: 1,
             }).addTo(group),
         });
@@ -572,7 +703,7 @@ function App() {
                 color: "#0f766e",
                 fillColor: "#ccfbf1",
                 fillOpacity: appliedControls.bufferOpacity / 100,
-                opacity: Math.min(1, appliedControls.bufferOpacity / 100 + 0.18),
+                opacity: Math.min(1, 0.3),//appliedControls.bufferOpacity / 100 + 0.18),
                 weight: 1,
               }).addTo(group),
           });
@@ -610,6 +741,29 @@ function App() {
           <p>{t("appEyebrow")}</p>
           <h1>{t("appTitle")}</h1>
         </header>
+
+
+        <ControlGroup icon={Activity} title={t("analysis")}>
+          <Checkbox label={t("highlightCandidates")} checked={controls.showCandidates} onChange={(value) => updateControl("showCandidates", value)} />
+          {/* <Range label={t("scoreThreshold")} value={controls.scoreThreshold} min={0} max={4} suffix="" onChange={(value) => updateControl("scoreThreshold", value)} /> */}
+            <label className="select-row">
+              {t("scoreThreshold")}
+              <select
+                value={controls.scoreThreshold}
+                onChange={(event) => updateControl("scoreThreshold", Number(event.target.value))}
+              >
+                <option value={-1}>絞らない</option>
+                <option value={0}>アクセス良好地域</option>
+                <option value={2}>要観察地域</option>
+                <option value={3}>優先対応地域</option>
+                <option value={4}>最優先対応地域</option>
+              </select>
+            </label>
+          <div className="stat-card">
+            <span>{t("candidateMeshes")}</span>
+            <strong>{candidateCount}</strong>
+          </div>
+        </ControlGroup>
 
         <ControlGroup icon={Layers} title={t("populationMesh")}>
           <Checkbox label={t("showMesh")} checked={controls.showMesh} onChange={(value) => updateControl("showMesh", value)} />
@@ -698,26 +852,6 @@ function App() {
           )}
         </ControlGroup>
 
-        <ControlGroup icon={Activity} title={t("analysis")}>
-          <Checkbox label={t("highlightCandidates")} checked={controls.showCandidates} onChange={(value) => updateControl("showCandidates", value)} />
-          {/* <Range label={t("scoreThreshold")} value={controls.scoreThreshold} min={0} max={4} suffix="" onChange={(value) => updateControl("scoreThreshold", value)} /> */}
-            <label className="select-row">
-              {t("scoreThreshold")}
-              <select
-                value={controls.scoreThreshold}
-                onChange={(event) => updateControl("scoreThreshold", Number(event.target.value))}
-              >
-                <option value={0}>アクセス良好地域</option>
-                <option value={2}>要観察地域</option>
-                <option value={3}>優先対応地域</option>
-                <option value={4}>最優先対応地域</option>
-              </select>
-            </label>
-          <div className="stat-card">
-            <span>{t("candidateMeshes")}</span>
-            <strong>{candidateCount}</strong>
-          </div>
-        </ControlGroup>
 
         <footer>
           {loading && <span>{t("loadingLayers")}</span>}
@@ -746,12 +880,67 @@ function App() {
             </div>
           </div>
         )}
+        if (controls.)
+        {/* <div className="legend">
+          {meshLegendItems.map((item) => item.label && (
+            <span key={item.label}>
+              <i style={{ backgroundColor: item.color }} />
+              {item.label}
+            </span>
+          ))}
+
+        </div> */}
+
         <div className="legend">
-          <span><i className="candidate" /> {t("candidate")}</span>
-          <span><i className="elderly" /> {t("higherElderlyRate")}</span>
+          <div className="legend-section">
+            <strong className="legend-title">
+              {appliedControls.showCandidates ? "Score" : controls.colorMode === "population" ? "Population" : "Elderly rate"}
+            </strong>
+
+            {meshLegendItems.map((item) => item.label && (
+              <span key={item.label} className="legend-item">
+                <i
+                  className="legend-square"
+                  style={{ backgroundColor: item.color }}
+                />
+                {item.label}
+              </span>
+            ))}
+          </div>
+
+          {appliedControls.showHospitals && (
+            <div className="legend-section">
+              <strong className="legend-title">Hospitals</strong>
+
+              {Object.entries(HOSPITAL_TYPE_STYLES).map(([type, item]) => (
+                <span key={`hospital-${type}`} className="legend-item">
+                  <i
+                    className="legend-circle"
+                    style={{
+                      backgroundColor: item.fillColor,
+                      borderColor: item.color,
+                    }}
+                  />
+                  {item.label}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {(appliedControls.showStations || appliedControls.showBusStops) && (
+            <div className="legend-section">
+              <strong className="legend-title">Transport</strong>
+
+              <span className="legend-item">
+                <i className="transport" /> {t("transport")}
+              </span>
+            </div>
+          )}
+        </div>
+        {/* <div>
           <span><i className="transport" /> {t("transport")}</span>
           <span><i className="medical" /> {t("medical")}</span>
-        </div>
+        </div> */}
       </main>
     </div>
   );
