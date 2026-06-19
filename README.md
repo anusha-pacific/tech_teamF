@@ -1,73 +1,68 @@
-# Team F Medical Access Dashboard
+# 富山県 医療アクセス可視化ダッシュボード
 
-Dockerized Flask + Leaflet dashboard for exploring 500m population mesh, medical facilities, public transport, buffers, and medical access difficulty candidates.
+## 概要
 
-## Requirements
+本プロジェクトは、富山県内の人口メッシュ、医療施設、公共交通停留所データを地図上で重ね合わせ、医療アクセスが困難になりやすい地域を可視化する Web ダッシュボードです。
 
-- Docker Desktop on Windows with the WSL 2 backend enabled
+主な目的は次の通りです。
+
+- 高齢者割合が高い地域を地図で確認する
+- 医療施設までの距離や公共交通へのアクセス状況を比較する
+- 半径やしきい値を変更しながら、医療アクセス困難候補を探索する
+
+## 使用技術
+
+- フロントエンド: React, Leaflet
+- バックエンド: Flask
+- 実行環境: Docker, Docker Compose
+
+## 必要なもの
+
+新しい端末で実行する場合、以下をインストールしてください。
+
 - Git
+- Docker Desktop
+- Windows の場合は WSL 2 の有効化を推奨
 
-## Run Locally
+Docker Desktop を起動した状態で作業してください。
 
-```powershell
+## GitHub から取得して実行する方法
+
+```bash
+git clone <GitHubリポジトリURL>
+cd <リポジトリ名>
 docker compose up --build
 ```
 
-Open:
-
-- Frontend: http://localhost:5173
-- Backend health check: http://localhost:5000/api/health
-
-## Data Files
-
-Place your real files here:
+起動後、ブラウザで以下を開きます。
 
 ```text
-data/
-  geojson/
-    mesh_population.geojson
-    hospitals.geojson
-    stations.geojson
-    bus_stops.geojson
-  gtfs/
-    stops.txt
+http://localhost:5173
 ```
 
-If `data/geojson/bus_stops.geojson` is missing, the backend will try to read GTFS `data/gtfs/stops.txt`.
+バックエンドの確認用 URL は以下です。
 
-## Mesh Properties
-
-The dashboard expects numeric values where possible:
-
-```json
-{
-  "mesh_id": "xxxx",
-  "population": 123,
-  "elderly_rate": 38.2,
-  "centroid_lon": 139.7,
-  "centroid_lat": 35.6,
-  "nearest_1ji_hospital_m": 850,
-  "nearest_2ji_hospital_m": 1300,
-  "nearest_3ji_hospital_m": 4200,
-  "nearest_medical_m": 850,
-  "nearest_bus_stop_m": 280,
-  "nearest_train_stop_m": 620,
-  "nearest_public_transport_m": 280,
-  "score": 82.4
-}
+```text
+http://localhost:5000/api/health
 ```
 
-Use `null` for unknown distances, not empty strings.
+## データ配置
 
-## API Endpoints
+GeoJSON データは以下に配置します。
 
-- `GET /api/health`
-- `GET /api/layers/mesh`
-- `GET /api/layers/hospitals`
-- `GET /api/layers/stations`
-- `GET /api/layers/bus-stops`
-- `POST /api/analyze/access-difficulty`
+```text
+data/geojson/
+```
 
-## Performance Approach
+現在の主な入力データ:
 
-The map draws visual buffers dynamically with Leaflet circles. Candidate mesh extraction uses precomputed nearest-distance fields, so changing radius sliders is a fast numeric filter instead of a heavy polygon buffer/intersection operation.
+- `mesh_hospital_nearest_wide.geojson`: メッシュ別の人口・高齢者割合・医療施設距離情報
+- `toyama_stops.geojson`: 富山県内の公共交通停留所情報
+- `hospitals.geojson`: 医療施設ポイント
+- `stations.geojson`: 鉄道駅ポイント
+
+## 停止方法
+
+```bash
+docker compose down
+```

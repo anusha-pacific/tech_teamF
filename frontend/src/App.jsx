@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { createRoot } from "react-dom/client";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import { Activity, Hospital, Languages, Layers, TrainFront } from "lucide-react";
+import { Activity, Hospital, Layers, TrainFront } from "lucide-react";
 import "./styles.css";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000";
@@ -75,6 +75,8 @@ const messages = {
     candidateMeshes: "Candidate meshes",
     loadingLayers: "Loading layers...",
     loadingDetail: "Reading GeoJSON and preparing map layers",
+    updatingMap: "Updating map...",
+    updatingDetail: "Applying filters and redrawing layers",
     ready: "Ready for your GeoJSON and GTFS files.",
     apiError: "API error",
     candidate: "Candidate",
@@ -123,6 +125,8 @@ const messages = {
     candidateMeshes: "候補メッシュ",
     loadingLayers: "レイヤーを読み込み中...",
     loadingDetail: "GeoJSONを読み込み、地図レイヤーを準備しています",
+    updatingMap: "地図を更新中...",
+    updatingDetail: "フィルターを適用し、レイヤーを再描画しています",
     ready: "GeoJSON / GTFS データを表示できます。",
     apiError: "APIエラー",
     candidate: "候補",
@@ -322,18 +326,21 @@ function App() {
   const layersRef = useRef({});
   const bufferRef = useRef({});
   const [controls, setControls] = useState(initialControls);
+  const [appliedControls, setAppliedControls] = useState(initialControls);
   const [language, setLanguage] = useState("en");
   const [data, setData] = useState({ mesh: null, hospitals: null, stations: null, busStops: null });
   const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
   const t = useMemo(() => createTranslator(language), [language]);
 
   const updateControl = useCallback((key, value) => {
+    setProcessing(true);
     setControls((current) => ({ ...current, [key]: value }));
   }, []);
 
   useEffect(() => {
-    const map = L.map("map", { zoomControl: false }).setView(TOYAMA_VIEW.center, TOYAMA_VIEW.zoom);
+    const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView(TOYAMA_VIEW.center, TOYAMA_VIEW.zoom);
     mapRef.current = map;
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
@@ -375,9 +382,18 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    setProcessing(true);
+    const timeoutId = window.setTimeout(() => {
+      setAppliedControls(controls);
+    }, 160);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [controls]);
+
   const candidateCount = useMemo(() => {
-    return data.mesh?.features?.filter((feature) => isCandidate(feature.properties, controls)).length || 0;
-  }, [data.mesh, controls]);
+    return data.mesh?.features?.filter((feature) => isCandidate(feature.properties, appliedControls)).length || 0;
+  }, [data.mesh, appliedControls]);
 
   const stopModeOptions = useMemo(() => {
     const modes = new Set();
@@ -389,135 +405,142 @@ function App() {
     if (!data.busStops) return null;
     return {
       ...data.busStops,
-      features: data.busStops.features.filter((feature) => stopMatchesFilters(feature, controls.stopModeVisibility)),
+      features: data.busStops.features.filter((feature) => stopMatchesFilters(feature, appliedControls.stopModeVisibility)),
     };
-  }, [data.busStops, controls.stopModeVisibility]);
+  }, [data.busStops, appliedControls.stopModeVisibility]);
 
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !data.mesh) return;
 
-    Object.values(layersRef.current).forEach((layer) => layer.remove());
-    Object.values(bufferRef.current).forEach((group) => group.remove());
-    layersRef.current = {};
-    bufferRef.current = {};
+    setProcessing(true);
 
-    if (controls.showMesh) {
-      layersRef.current.mesh = L.geoJSON(data.mesh, {
-        pointToLayer: (feature, latlng) =>
-          L.circleMarker(latlng, {
-            radius: isCandidate(feature.properties, controls) ? 6 : 4,
-            color: isCandidate(feature.properties, controls) ? "#991b1b" : "#374151",
-            fillColor: meshColor(feature.properties, controls),
-            fillOpacity: isCandidate(feature.properties, controls) ? 0.82 : 0.62,
-            weight: isCandidate(feature.properties, controls) ? 2 : 1,
+    const frameId = window.requestAnimationFrame(() => {
+      Object.values(layersRef.current).forEach((layer) => layer.remove());
+      Object.values(bufferRef.current).forEach((group) => group.remove());
+      layersRef.current = {};
+      bufferRef.current = {};
+
+      if (appliedControls.showMesh) {
+        layersRef.current.mesh = L.geoJSON(data.mesh, {
+          pointToLayer: (feature, latlng) =>
+            L.circleMarker(latlng, {
+              radius: isCandidate(feature.properties, appliedControls) ? 6 : 4,
+              color: isCandidate(feature.properties, appliedControls) ? "#991b1b" : "#374151",
+              fillColor: meshColor(feature.properties, appliedControls),
+              fillOpacity: isCandidate(feature.properties, appliedControls) ? 0.82 : 0.62,
+              weight: isCandidate(feature.properties, appliedControls) ? 2 : 1,
+            }),
+          style: (feature) => ({
+            color: isCandidate(feature.properties, appliedControls) ? "#991b1b" : "#374151",
+            fillColor: meshColor(feature.properties, appliedControls),
+            fillOpacity: isCandidate(feature.properties, appliedControls) ? 0.72 : 0.48,
+            weight: isCandidate(feature.properties, appliedControls) ? 2 : 1,
           }),
-        style: (feature) => ({
-          color: isCandidate(feature.properties, controls) ? "#991b1b" : "#374151",
-          fillColor: meshColor(feature.properties, controls),
-          fillOpacity: isCandidate(feature.properties, controls) ? 0.72 : 0.48,
-          weight: isCandidate(feature.properties, controls) ? 2 : 1,
-        }),
-        onEachFeature: (feature, layer) => layer.bindPopup(meshPopup(feature, controls)),
-      }).addTo(map);
-    }
+          onEachFeature: (feature, layer) => layer.bindPopup(() => meshPopup(feature, appliedControls)),
+        }).addTo(map);
+      }
 
-    if (controls.showHospitals && data.hospitals) {
-      layersRef.current.hospitals = L.geoJSON(data.hospitals, {
-        pointToLayer: (feature, latlng) =>
-          L.circleMarker(latlng, {
-            radius: 6,
-            color: "#7f1d1d",
-            fillColor: "#ef4444",
-            fillOpacity: 0.9,
-            weight: 2,
-          }),
-        onEachFeature: (feature, layer) => layer.bindPopup(pointPopup(feature, "Medical facility")),
-      }).addTo(map);
-    }
+      if (appliedControls.showHospitals && data.hospitals) {
+        layersRef.current.hospitals = L.geoJSON(data.hospitals, {
+          pointToLayer: (feature, latlng) =>
+            L.circleMarker(latlng, {
+              radius: 6,
+              color: "#7f1d1d",
+              fillColor: "#ef4444",
+              fillOpacity: 0.9,
+              weight: 2,
+            }),
+          onEachFeature: (feature, layer) => layer.bindPopup(() => pointPopup(feature, "Medical facility")),
+        }).addTo(map);
+      }
 
-    if (controls.showStations && data.stations) {
-      layersRef.current.stations = L.geoJSON(data.stations, {
-        pointToLayer: (feature, latlng) =>
-          L.circleMarker(latlng, {
-            radius: 6,
-            color: "#0f766e",
-            fillColor: "#2dd4bf",
-            fillOpacity: 0.9,
-            weight: 2,
-          }),
-        onEachFeature: (feature, layer) => layer.bindPopup(pointPopup(feature, "Train station")),
-      }).addTo(map);
-    }
+      if (appliedControls.showStations && data.stations) {
+        layersRef.current.stations = L.geoJSON(data.stations, {
+          pointToLayer: (feature, latlng) =>
+            L.circleMarker(latlng, {
+              radius: 6,
+              color: "#0f766e",
+              fillColor: "#2dd4bf",
+              fillOpacity: 0.9,
+              weight: 2,
+            }),
+          onEachFeature: (feature, layer) => layer.bindPopup(() => pointPopup(feature, "Train station")),
+        }).addTo(map);
+      }
 
-    if (controls.showBusStops && filteredBusStops) {
-      layersRef.current.busStops = L.geoJSON(filteredBusStops, {
-        pointToLayer: (feature, latlng) => {
-          const colors = stopColor(feature);
-          return L.circleMarker(latlng, {
-            radius: colors.radius,
-            color: colors.color,
-            fillColor: colors.fillColor,
-            fillOpacity: 0.9,
-            weight: 1,
-          });
-        },
-        onEachFeature: (feature, layer) => layer.bindPopup(pointPopup(feature, "Transport stop")),
-      }).addTo(map);
-    }
+      if (appliedControls.showBusStops && filteredBusStops) {
+        layersRef.current.busStops = L.geoJSON(filteredBusStops, {
+          pointToLayer: (feature, latlng) => {
+            const colors = stopColor(feature);
+            return L.circleMarker(latlng, {
+              radius: colors.radius,
+              color: colors.color,
+              fillColor: colors.fillColor,
+              fillOpacity: 0.9,
+              weight: 1,
+            });
+          },
+          onEachFeature: (feature, layer) => layer.bindPopup(() => pointPopup(feature, "Transport stop")),
+        }).addTo(map);
+      }
 
-    if (controls.showMedicalBuffers && data.hospitals) {
-      const group = L.layerGroup();
-      L.geoJSON(data.hospitals, {
-        pointToLayer: (_feature, latlng) =>
-          L.circle(latlng, {
-            radius: controls.medicalRadiusM,
-            color: "#dc2626",
-            fillColor: "#fecaca",
-            fillOpacity: 0.15,
-            weight: 1,
-          }).addTo(group),
-      });
-      group.addTo(map);
-      bufferRef.current.medical = group;
-    }
-
-    if (controls.showTransportBuffers) {
-      const group = L.layerGroup();
-      const trainRadius = controls.mergePublicTransport ? controls.publicTransportRadiusM : controls.trainRadiusM;
-      const busRadius = controls.mergePublicTransport ? controls.publicTransportRadiusM : controls.busRadiusM;
-
-      if (data.stations) {
-        L.geoJSON(data.stations, {
+      if (appliedControls.showMedicalBuffers && data.hospitals) {
+        const group = L.layerGroup();
+        L.geoJSON(data.hospitals, {
           pointToLayer: (_feature, latlng) =>
             L.circle(latlng, {
-              radius: trainRadius,
-              color: "#0f766e",
-              fillColor: "#ccfbf1",
+              radius: appliedControls.medicalRadiusM,
+              color: "#dc2626",
+              fillColor: "#fecaca",
               fillOpacity: 0.15,
               weight: 1,
             }).addTo(group),
         });
+        group.addTo(map);
+        bufferRef.current.medical = group;
       }
 
-      if (filteredBusStops) {
-        L.geoJSON(filteredBusStops, {
-          pointToLayer: (_feature, latlng) =>
-            L.circle(latlng, {
-              radius: busRadius,
-              color: "#2563eb",
-              fillColor: "#bfdbfe",
-              fillOpacity: 0.12,
-              weight: 1,
-            }).addTo(group),
-        });
+      if (appliedControls.showTransportBuffers) {
+        const group = L.layerGroup();
+        const trainRadius = appliedControls.mergePublicTransport ? appliedControls.publicTransportRadiusM : appliedControls.trainRadiusM;
+        const busRadius = appliedControls.mergePublicTransport ? appliedControls.publicTransportRadiusM : appliedControls.busRadiusM;
+
+        if (data.stations) {
+          L.geoJSON(data.stations, {
+            pointToLayer: (_feature, latlng) =>
+              L.circle(latlng, {
+                radius: trainRadius,
+                color: "#0f766e",
+                fillColor: "#ccfbf1",
+                fillOpacity: 0.15,
+                weight: 1,
+              }).addTo(group),
+          });
+        }
+
+        if (filteredBusStops) {
+          L.geoJSON(filteredBusStops, {
+            pointToLayer: (_feature, latlng) =>
+              L.circle(latlng, {
+                radius: busRadius,
+                color: "#2563eb",
+                fillColor: "#bfdbfe",
+                fillOpacity: 0.12,
+                weight: 1,
+              }).addTo(group),
+          });
+        }
+
+        group.addTo(map);
+        bufferRef.current.transport = group;
       }
 
-      group.addTo(map);
-      bufferRef.current.transport = group;
-    }
+      window.setTimeout(() => setProcessing(false), 80);
+    });
 
-  }, [data, controls, filteredBusStops]);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [data, appliedControls, filteredBusStops]);
 
   return (
     <div className="dashboard">
@@ -526,16 +549,6 @@ function App() {
           <p>{t("appEyebrow")}</p>
           <h1>{t("appTitle")}</h1>
         </header>
-
-        <ControlGroup icon={Languages} title={t("language")}>
-          <label className="select-row">
-            {t("languageLabel")}
-            <select value={language} onChange={(event) => setLanguage(event.target.value)}>
-              <option value="en">{t("english")}</option>
-              <option value="ja">{t("japanese")}</option>
-            </select>
-          </label>
-        </ControlGroup>
 
         <ControlGroup icon={Layers} title={t("populationMesh")}>
           <Checkbox label={t("showMesh")} checked={controls.showMesh} onChange={(value) => updateControl("showMesh", value)} />
@@ -635,19 +648,28 @@ function App() {
 
         <footer>
           {loading && <span>{t("loadingLayers")}</span>}
+          {!loading && processing && <span>{t("updatingMap")}</span>}
           {error && <span className="error">{t("apiError")}: {error}</span>}
-          {!loading && !error && <span>{t("ready")}</span>}
+          {!loading && !processing && !error && <span>{t("ready")}</span>}
         </footer>
       </aside>
 
       <main className="map-shell">
         <div id="map" />
-        {loading && (
+        <div className="language-toggle" aria-label={t("languageLabel")}>
+          <button className={language === "en" ? "active" : ""} onClick={() => setLanguage("en")}>
+            EN
+          </button>
+          <button className={language === "ja" ? "active" : ""} onClick={() => setLanguage("ja")}>
+            日本語
+          </button>
+        </div>
+        {(loading || processing) && (
           <div className="loading-overlay" role="status" aria-live="polite">
             <div className="loading-panel">
               <div className="spinner" />
-              <strong>{t("loadingLayers")}</strong>
-              <span>{t("loadingDetail")}</span>
+              <strong>{loading ? t("loadingLayers") : t("updatingMap")}</strong>
+              <span>{loading ? t("loadingDetail") : t("updatingDetail")}</span>
             </div>
           </div>
         )}
