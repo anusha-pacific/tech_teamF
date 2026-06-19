@@ -207,7 +207,10 @@ function isCandidate(properties, controls) {
     elderlyRate >= controls.elderlyRateThreshold &&
     outsideMedical &&
     outsidePublic &&
-    score === controls.scoreThreshold
+    (
+      (controls.scoreThreshold===2 && (score === 1 || score === 2) ) || 
+      (controls.scoreThreshold ===  score)
+    )
   );
 }
 
@@ -452,7 +455,16 @@ function App() {
       bufferRef.current = {};
 
       if (appliedControls.showMesh) {
-        layersRef.current.mesh = L.geoJSON(data.mesh, {
+        const scoreFilteredMesh = {
+          ...data.mesh,
+          features: data.mesh.features.filter(
+            (feature) => getScore(feature.properties) === appliedControls.scoreThreshold
+          ),
+        };
+
+        layersRef.current.mesh = L.geoJSON(scoreFilteredMesh, {
+      // if (appliedControls.showMesh) {
+      //   layersRef.current.mesh = L.geoJSON(data.mesh, {
           pointToLayer: (feature, latlng) => {
             const candidate = isCandidate(feature.properties, appliedControls);
             return L.circle(latlng, {
@@ -476,6 +488,7 @@ function App() {
           onEachFeature: (feature, layer) => layer.bindPopup(() => meshPopup(feature, appliedControls)),
         }).addTo(map);
       }
+      
 
       if (appliedControls.showHospitals && data.hospitals) {
         layersRef.current.hospitals = L.geoJSON(data.hospitals, {
@@ -687,7 +700,19 @@ function App() {
 
         <ControlGroup icon={Activity} title={t("analysis")}>
           <Checkbox label={t("highlightCandidates")} checked={controls.showCandidates} onChange={(value) => updateControl("showCandidates", value)} />
-          <Range label={t("scoreThreshold")} value={controls.scoreThreshold} min={0} max={4} suffix="" onChange={(value) => updateControl("scoreThreshold", value)} />
+          {/* <Range label={t("scoreThreshold")} value={controls.scoreThreshold} min={0} max={4} suffix="" onChange={(value) => updateControl("scoreThreshold", value)} /> */}
+            <label className="select-row">
+              {t("scoreThreshold")}
+              <select
+                value={controls.scoreThreshold}
+                onChange={(event) => updateControl("scoreThreshold", Number(event.target.value))}
+              >
+                <option value={0}>アクセス良好地域</option>
+                <option value={2}>要観察地域</option>
+                <option value={3}>優先対応地域</option>
+                <option value={4}>最優先対応地域</option>
+              </select>
+            </label>
           <div className="stat-card">
             <span>{t("candidateMeshes")}</span>
             <strong>{candidateCount}</strong>
