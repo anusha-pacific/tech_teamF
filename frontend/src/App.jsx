@@ -19,18 +19,23 @@ const initialControls = {
   elderlyRateThreshold: 35,
   medicalRadiusM: 1000,
   trainRadiusM: 500,
-  busRadiusM: 300,
+  busRadiusM: 500,
   mergePublicTransport: false,
   publicTransportRadiusM: 500,
-  scoreThreshold: 70,
+  scoreThreshold: 4,
   hospitalField: "nearest_medical_m",
   stopModeVisibility: {},
+  meshOpacity: 48,
+  pointOpacity: 88,
+  bufferOpacity: 16,
 };
 
 const TOYAMA_VIEW = {
   center: [36.6953, 137.2113],
   zoom: 10,
 };
+
+const MESH_EQUAL_AREA_RADIUS_M = Math.sqrt((500 * 500) / Math.PI);
 
 const messages = {
   en: {
@@ -56,6 +61,9 @@ const messages = {
     nearest3ji: "Nearest 3ji hospital",
     medicalRadius: "Medical radius",
     publicTransport: "Public Transport",
+    layerOpacity: "Layer opacity",
+    pointOpacity: "Point opacity",
+    bufferOpacity: "Buffer opacity",
     showTrainStations: "Show train stations",
     showToyamaStops: "Show Toyama stops",
     showTransportBuffers: "Show transport buffers",
@@ -82,6 +90,13 @@ const messages = {
     candidate: "Candidate",
     higherElderlyRate: "Higher 65+ rate",
     transport: "Transport",
+    meshScaleNote: "Mesh centroids shown as equal-area 500m mesh circles",
+    medicalBufferLegend: "Medical buffer",
+    transportBufferLegend: "Transport buffer",
+    busStopsLegend: "Bus stops",
+    tramStopsLegend: "Tram / light rail stops",
+    stationsLegend: "Train stations",
+    hospitalsLegend: "Hospitals / clinics",
   },
   ja: {
     appEyebrow: "Team F ダッシュボード",
@@ -168,7 +183,11 @@ function getScore(properties) {
   const elderlyRate = Number(properties?.elderly_rate) || 0;
   const medical = getMedicalDistance(properties, "nearest_medical_m") || 0;
   const transport = getMeters(properties, "nearest_public_transport_m") || getMeters(properties, "nearest_bus_stop_m") || 0;
-  return Math.min(100, elderlyRate * 0.6 + medical / 100 + transport / 100);
+  
+  var score_elderly = ((elderlyRate>=.35)+(elderlyRate>=.4) ) 
+  var score_transport = (transport>=500)
+  var score_kourei = (medical>1000) 
+  return score_elderly + score_transport + score_kourei;
 }
 
 function isCandidate(properties, controls) {
@@ -188,7 +207,7 @@ function isCandidate(properties, controls) {
     elderlyRate >= controls.elderlyRateThreshold &&
     outsideMedical &&
     outsidePublic &&
-    score >= controls.scoreThreshold
+    score === controls.scoreThreshold
   );
 }
 
@@ -343,6 +362,17 @@ function App() {
     const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView(TOYAMA_VIEW.center, TOYAMA_VIEW.zoom);
     mapRef.current = map;
 
+    [
+      ["bufferPane", 390],
+      ["meshPane", 430],
+      ["stopPane", 500],
+      ["stationPane", 520],
+      ["medicalPane", 540],
+    ].forEach(([name, zIndex]) => {
+      map.createPane(name);
+      map.getPane(name).style.zIndex = zIndex;
+    });
+
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
@@ -423,19 +453,25 @@ function App() {
 
       if (appliedControls.showMesh) {
         layersRef.current.mesh = L.geoJSON(data.mesh, {
-          pointToLayer: (feature, latlng) =>
-            L.circleMarker(latlng, {
-              radius: isCandidate(feature.properties, appliedControls) ? 6 : 4,
-              color: isCandidate(feature.properties, appliedControls) ? "#991b1b" : "#374151",
+          pointToLayer: (feature, latlng) => {
+            const candidate = isCandidate(feature.properties, appliedControls);
+            return L.circle(latlng, {
+              pane: "meshPane",
+              radius: MESH_EQUAL_AREA_RADIUS_M,
+              color: candidate ? "#991b1b" : "#374151",
               fillColor: meshColor(feature.properties, appliedControls),
-              fillOpacity: isCandidate(feature.properties, appliedControls) ? 0.82 : 0.62,
-              weight: isCandidate(feature.properties, appliedControls) ? 2 : 1,
-            }),
+              fillOpacity: (appliedControls.meshOpacity / 100) * (candidate ? 1 : 0.86),
+              opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
+              weight: candidate ? 2 : 1,
+            });
+          },
           style: (feature) => ({
             color: isCandidate(feature.properties, appliedControls) ? "#991b1b" : "#374151",
             fillColor: meshColor(feature.properties, appliedControls),
-            fillOpacity: isCandidate(feature.properties, appliedControls) ? 0.72 : 0.48,
+            fillOpacity: appliedControls.meshOpacity / 100,
+            opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
             weight: isCandidate(feature.properties, appliedControls) ? 2 : 1,
+            pane: "meshPane",
           }),
           onEachFeature: (feature, layer) => layer.bindPopup(() => meshPopup(feature, appliedControls)),
         }).addTo(map);
@@ -445,10 +481,12 @@ function App() {
         layersRef.current.hospitals = L.geoJSON(data.hospitals, {
           pointToLayer: (feature, latlng) =>
             L.circleMarker(latlng, {
+              pane: "medicalPane",
               radius: 6,
               color: "#7f1d1d",
               fillColor: "#ef4444",
-              fillOpacity: 0.9,
+              fillOpacity: appliedControls.pointOpacity / 100,
+              opacity: Math.min(1, appliedControls.pointOpacity / 100 + 0.12),
               weight: 2,
             }),
           onEachFeature: (feature, layer) => layer.bindPopup(() => pointPopup(feature, "Medical facility")),
@@ -459,10 +497,12 @@ function App() {
         layersRef.current.stations = L.geoJSON(data.stations, {
           pointToLayer: (feature, latlng) =>
             L.circleMarker(latlng, {
+              pane: "stationPane",
               radius: 6,
               color: "#0f766e",
               fillColor: "#2dd4bf",
-              fillOpacity: 0.9,
+              fillOpacity: appliedControls.pointOpacity / 100,
+              opacity: Math.min(1, appliedControls.pointOpacity / 100 + 0.12),
               weight: 2,
             }),
           onEachFeature: (feature, layer) => layer.bindPopup(() => pointPopup(feature, "Train station")),
@@ -474,10 +514,12 @@ function App() {
           pointToLayer: (feature, latlng) => {
             const colors = stopColor(feature);
             return L.circleMarker(latlng, {
+              pane: "stopPane",
               radius: colors.radius,
               color: colors.color,
               fillColor: colors.fillColor,
-              fillOpacity: 0.9,
+              fillOpacity: appliedControls.pointOpacity / 100,
+              opacity: Math.min(1, appliedControls.pointOpacity / 100 + 0.12),
               weight: 1,
             });
           },
@@ -490,10 +532,12 @@ function App() {
         L.geoJSON(data.hospitals, {
           pointToLayer: (_feature, latlng) =>
             L.circle(latlng, {
+              pane: "bufferPane",
               radius: appliedControls.medicalRadiusM,
               color: "#dc2626",
               fillColor: "#fecaca",
-              fillOpacity: 0.15,
+              fillOpacity: appliedControls.bufferOpacity / 100,
+              opacity: Math.min(1, appliedControls.bufferOpacity / 100 + 0.18),
               weight: 1,
             }).addTo(group),
         });
@@ -509,11 +553,13 @@ function App() {
         if (data.stations) {
           L.geoJSON(data.stations, {
             pointToLayer: (_feature, latlng) =>
-              L.circle(latlng, {
+            L.circle(latlng, {
+                pane: "bufferPane",
                 radius: trainRadius,
                 color: "#0f766e",
                 fillColor: "#ccfbf1",
-                fillOpacity: 0.15,
+                fillOpacity: appliedControls.bufferOpacity / 100,
+                opacity: Math.min(1, appliedControls.bufferOpacity / 100 + 0.18),
                 weight: 1,
               }).addTo(group),
           });
@@ -522,11 +568,13 @@ function App() {
         if (filteredBusStops) {
           L.geoJSON(filteredBusStops, {
             pointToLayer: (_feature, latlng) =>
-              L.circle(latlng, {
+            L.circle(latlng, {
+                pane: "bufferPane",
                 radius: busRadius,
                 color: "#2563eb",
                 fillColor: "#bfdbfe",
-                fillOpacity: 0.12,
+                fillOpacity: appliedControls.bufferOpacity / 100,
+                opacity: Math.min(1, appliedControls.bufferOpacity / 100 + 0.18),
                 weight: 1,
               }).addTo(group),
           });
@@ -639,7 +687,7 @@ function App() {
 
         <ControlGroup icon={Activity} title={t("analysis")}>
           <Checkbox label={t("highlightCandidates")} checked={controls.showCandidates} onChange={(value) => updateControl("showCandidates", value)} />
-          <Range label={t("scoreThreshold")} value={controls.scoreThreshold} min={0} max={100} suffix="" onChange={(value) => updateControl("scoreThreshold", value)} />
+          <Range label={t("scoreThreshold")} value={controls.scoreThreshold} min={0} max={4} suffix="" onChange={(value) => updateControl("scoreThreshold", value)} />
           <div className="stat-card">
             <span>{t("candidateMeshes")}</span>
             <strong>{candidateCount}</strong>
