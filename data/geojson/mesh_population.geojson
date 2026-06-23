@@ -1,0 +1,71 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "mesh_id": "sample-001",
+        "population": 420,
+        "elderly_rate": 42.3,
+        "centroid_lon": 139.762,
+        "centroid_lat": 35.681,
+        "nearest_1ji_hospital_m": 1250,
+        "nearest_2ji_hospital_m": 2400,
+        "nearest_3ji_hospital_m": 4100,
+        "nearest_medical_m": 1250,
+        "nearest_bus_stop_m": 620,
+        "nearest_train_stop_m": 780,
+        "nearest_public_transport_m": 620,
+        "score": 82.4
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[139.758, 35.679], [139.766, 35.679], [139.766, 35.683], [139.758, 35.683], [139.758, 35.679]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mesh_id": "sample-002",
+        "population": 680,
+        "elderly_rate": 28.4,
+        "centroid_lon": 139.772,
+        "centroid_lat": 35.681,
+        "nearest_1ji_hospital_m": 480,
+        "nearest_2ji_hospital_m": 1600,
+        "nearest_3ji_hospital_m": 3500,
+        "nearest_medical_m": 480,
+        "nearest_bus_stop_m": 190,
+        "nearest_train_stop_m": 430,
+        "nearest_public_transport_m": 190,
+        "score": 45.2
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[139.768, 35.679], [139.776, 35.679], [139.776, 35.683], [139.768, 35.683], [139.768, 35.679]]]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "mesh_id": "sample-003",
+        "population": 210,
+        "elderly_rate": 51.7,
+        "centroid_lon": 139.762,
+        "centroid_lat": 35.675,
+        "nearest_1ji_hospital_m": 1800,
+        "nearest_2ji_hospital_m": 3200,
+        "nearest_3ji_hospital_m": 5200,
+        "nearest_medical_m": 1800,
+        "nearest_bus_stop_m": 760,
+        "nearest_train_stop_m": 1120,
+        "nearest_public_transport_m": 760,
+        "score": 88.1
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[139.758, 35.673], [139.766, 35.673], [139.766, 35.677], [139.758, 35.677], [139.758, 35.673]]]
+      }
+    }
+  ]
+}
