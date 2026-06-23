@@ -22,7 +22,7 @@ const initialControls = {
   busRadiusM: 500,
   mergePublicTransport: false,
   publicTransportRadiusM: 500,
-  scoreThreshold: 4,
+  scoreThreshold: -1,
   hospitalField: "nearest_medical_m",
   stopModeVisibility: {},
   meshOpacity: 48,
@@ -37,6 +37,7 @@ const TOYAMA_VIEW = {
 
 const MESH_EQUAL_AREA_RADIUS_M = Math.sqrt((500 * 500) / Math.PI);
 const HOSPITAL_MARKER_RADIUS_M = Math.sqrt((500 * 500) / Math.PI);
+const STOPS_MARKER_RADIUS_M = Math.sqrt((520 * 520) / Math.PI);
 
 const messages = {
   en: {
@@ -80,7 +81,7 @@ const messages = {
     busRadius: "Bus radius",
     analysis: "Analysis",
     highlightCandidates: "Highlight access difficulty candidates",
-    scoreThreshold: "Access Difficulty Filter",
+    scoreThreshold: "Medical Access Difficulty Filter",
     candidateMeshes: "Candidate meshes",
     loadingLayers: "Loading layers...",
     loadingDetail: "Reading GeoJSON and preparing map layers",
@@ -98,6 +99,42 @@ const messages = {
     tramStopsLegend: "Tram / light rail stops",
     stationsLegend: "Train stations",
     hospitalsLegend: "Hospitals / clinics",
+    noFilter: "Show all",
+    accessPriority: "Medical Access Priority",
+    accessPriorityFilter: "Medical Access Priority Filter",
+    status: "Status",
+    normal: "Normal",
+    medicalAccessDifficultyCandidate: "Medical access difficulty candidate",
+
+    meshId: "Mesh ID",
+    nearestBusStop: "Nearest bus stop",
+    nearestTrainStation: "Nearest train station",
+
+    hospitals: "Hospitals",
+    primaryHospital: "Primary hospital",
+    secondaryHospital: "Secondary hospital",
+    level25Hospital: "2.5-level hospital",
+    tertiaryHospital: "Tertiary hospital",
+    unknownHospitalType: "Unknown hospital type",
+
+    scoreVeryHighPriority: "Highest-priority support area",
+    scoreHighPriority: "Priority support area",
+    scoreWatchArea: "Monitoring area",
+    scoreGoodAccess: "Good access area",
+
+    elderlyRate45: "65+ rate ≥ 45%",
+    elderlyRate35: "65+ rate ≥ 35%",
+    elderlyRate25: "65+ rate ≥ 25%",
+    elderlyRatePositive: "65+ rate > 0%",
+    noElderlyData: "No elderly data",
+
+    population800: "Population > 800",
+    population500: "Population > 500",
+    population250: "Population > 250",
+    populationPositive: "Population > 0",
+    noPopulation: "No population",
+
+    railTrain: "Rail / Train",
   },
   ja: {
     appEyebrow: "Team F ダッシュボード",
@@ -148,6 +185,43 @@ const messages = {
     candidate: "候補",
     higherElderlyRate: "高い65歳以上割合",
     transport: "公共交通",
+
+    noFilter: "絞らない",
+    accessPriority: "医療アクセス優先度",
+    accessPriorityFilter: "医療アクセス優先度で絞る",
+    status: "状態",
+    normal: "通常",
+    medicalAccessDifficultyCandidate: "医療アクセス困難候補",
+
+    meshId: "メッシュID",
+    nearestBusStop: "最寄りバス停",
+    nearestTrainStation: "最寄り鉄道駅",
+
+    hospitals: "病院・診療所",
+    primaryHospital: "一次医療施設",
+    secondaryHospital: "二次医療施設",
+    level25Hospital: "2.5次医療施設",
+    tertiaryHospital: "三次医療施設",
+    unknownHospitalType: "医療施設種別不明",
+
+    scoreVeryHighPriority: "最優先対応地域",
+    scoreHighPriority: "優先対応地域",
+    scoreWatchArea: "要観察地域",
+    scoreGoodAccess: "アクセス良好地域",
+
+    elderlyRate45: "65歳以上割合 ≥ 45%",
+    elderlyRate35: "65歳以上割合 ≥ 35%",
+    elderlyRate25: "65歳以上割合 ≥ 25%",
+    elderlyRatePositive: "65歳以上割合 > 0%",
+    noElderlyData: "高齢者データなし",
+
+    population800: "人口 > 800",
+    population500: "人口 > 500",
+    population250: "人口 > 250",
+    populationPositive: "人口 > 0",
+    noPopulation: "人口データなし",
+
+    railTrain: "鉄道",
   },
 };
 
@@ -155,24 +229,25 @@ const HOSPITAL_TYPE_STYLES = {
   "1": {
     color: "#2563eb",
     fillColor: "#60a5fa",
-    label: "Primary hospital",
+    labelKey: "primaryHospital",
   },
   "2": {
     color: "#16a34a",
     fillColor: "#86efac",
-    label: "Secondary hospital",
+    labelKey: "secondaryHospital",
   },
   "2.5": {
     color: "#f59e0b",
     fillColor: "#fde68a",
-    label: "2.5-level hospital",
+    labelKey: "level25Hospital",
   },
   "3": {
     color: "#7f1d1d",
     fillColor: "#ef4444",
-    label: "Tertiary hospital",
+    labelKey: "tertiaryHospital",
   },
 };
+
 
 function getHospitalTypeStyle(properties) {
   const type = String(properties?.P04_001 ?? "").trim();
@@ -181,7 +256,7 @@ function getHospitalTypeStyle(properties) {
     HOSPITAL_TYPE_STYLES[type] || {
       color: "#6b7280",
       fillColor: "#d1d5db",
-      label: "Unknown hospital type",
+      labelKey: "unknownHospitalType",
     }
   );
 }
@@ -260,28 +335,59 @@ function isCandidate(properties, controls) {
 }
 
 const SCORE_COLOR_RULES = [
-  { score: 4, color: "#dc2626", label: "最優先対応地域" },
-  { score: 3, color: "#e68416", label: "優先対応地域" },
-  { score: 2, color: "#ece912", label: "" },
-  { score: 1, color: "#ece912", label: "要観察地域" },
-  { score: 0, color: "#33e90f", label: "アクセス良好地域" },
+  { score: 4, color: "#dc2626", labelKey: "scoreVeryHighPriority" },
+  { score: 3, color: "#e68416", labelKey: "scoreHighPriority" },
+  { score: 2, color: "#ece912", labelKey: "scoreWatchArea" },
+  { score: 1, color: "#ece912", labelKey: "scoreWatchArea" },
+  { score: 0, color: "#33e90f", labelKey: "scoreGoodAccess" },
+];
+
+const SCORE_LEGEND_ITEMS = [
+  { key: "score-4", color: "#dc2626", labelKey: "scoreVeryHighPriority" },
+  { key: "score-3", color: "#e68416", labelKey: "scoreHighPriority" },
+  { key: "score-1-2", color: "#ece912", labelKey: "scoreWatchArea" },
+  { key: "score-0", color: "#33e90f", labelKey: "scoreGoodAccess" },
 ];
 
 const ELDERLY_COLOR_RULES = [
-  { color: "#7f1d1d", label: "65+ rate ≥ 45%" },
-  { color: "#b91c1c", label: "65+ rate ≥ 35%" },
-  { color: "#f59e0b", label: "65+ rate ≥ 25%" },
-  { color: "#fde68a", label: "65+ rate > 0%" },
-  { color: "#f3f4f6", label: "No elderly data" },
+  { key: "elderly-45", color: "#7f1d1d", labelKey: "elderlyRate45" },
+  { key: "elderly-35", color: "#b91c1c", labelKey: "elderlyRate35" },
+  { key: "elderly-25", color: "#f59e0b", labelKey: "elderlyRate25" },
+  { key: "elderly-positive", color: "#fde68a", labelKey: "elderlyRatePositive" },
+  { key: "elderly-none", color: "#f3f4f6", labelKey: "noElderlyData" },
 ];
 
 const POPULATION_COLOR_RULES = [
-  { color: "#7c2d12", label: "Population > 800" },
-  { color: "#c2410c", label: "Population > 500" },
-  { color: "#f97316", label: "Population > 250" },
-  { color: "#fdba74", label: "Population > 0" },
-  { color: "#f3f4f6", label: "No population" },
+  { key: "population-800", color: "#7c2d12", labelKey: "population800" },
+  { key: "population-500", color: "#c2410c", labelKey: "population500" },
+  { key: "population-250", color: "#f97316", labelKey: "population250" },
+  { key: "population-positive", color: "#fdba74", labelKey: "populationPositive" },
+  { key: "population-none", color: "#f3f4f6", labelKey: "noPopulation" },
 ];
+
+// const SCORE_COLOR_RULES = [
+//   { score: 4, color: "#dc2626", label: "最優先対応地域" },
+//   { score: 3, color: "#e68416", label: "優先対応地域" },
+//   { score: 2, color: "#ece912", label: "" },
+//   { score: 1, color: "#ece912", label: "要観察地域" },
+//   { score: 0, color: "#33e90f", label: "アクセス良好地域" },
+// ];
+
+// const ELDERLY_COLOR_RULES = [
+//   { color: "#7f1d1d", label: "65+ rate ≥ 45%" },
+//   { color: "#b91c1c", label: "65+ rate ≥ 35%" },
+//   { color: "#f59e0b", label: "65+ rate ≥ 25%" },
+//   { color: "#fde68a", label: "65+ rate > 0%" },
+//   { color: "#f3f4f6", label: "No elderly data" },
+// ];
+
+// const POPULATION_COLOR_RULES = [
+//   { color: "#7c2d12", label: "Population > 800" },
+//   { color: "#c2410c", label: "Population > 500" },
+//   { color: "#f97316", label: "Population > 250" },
+//   { color: "#fdba74", label: "Population > 0" },
+//   { color: "#f3f4f6", label: "No population" },
+// ];
 
 function matchColorScore(actualScore, targetScore) {
   return Number(actualScore) === Number(targetScore);
@@ -293,7 +399,7 @@ function getScoreColor(score) {
 
 function getMeshLegendItems(controls) {
   if (controls.showCandidates) {
-    return SCORE_COLOR_RULES;
+    return SCORE_LEGEND_ITEMS;
   }
 
   if (controls.colorMode === "population") {
@@ -325,24 +431,25 @@ function meshColor(properties, controls) {
   return "#f3f4f6";
 }
 
-function meshPopup(feature, controls) {
+function meshPopup(feature, controls, t) {
   const p = feature.properties || {};
   const candidate = isCandidate(p, controls);
+
   return `
     <div class="map-popup">
       <h3>500m Mesh</h3>
       <dl>
-        <dt>Mesh ID</dt><dd>${p.mesh_id ?? "N/A"}</dd>
-        <dt>Population</dt><dd>${formatNumber(p.population)}</dd>
-        <dt>65+ rate</dt><dd>${formatNumber(p.elderly_rate, "%")}</dd>
-        <dt>Nearest medical</dt><dd>${formatNumber(getMedicalDistance(p, controls.hospitalField), " m")}</dd>
-        <dt>Nearest 1ji hospital</dt><dd>${formatNumber(p.nearest_1ji_hospital_m, " m")}</dd>
-        <dt>Nearest 2ji hospital</dt><dd>${formatNumber(p.nearest_2ji_hospital_m, " m")}</dd>
-        <dt>Nearest 3ji hospital</dt><dd>${formatNumber(p.nearest_3ji_hospital_m, " m")}</dd>
-        <dt>Nearest bus stop</dt><dd>${formatNumber(p.nearest_bus_stop_m, " m")}</dd>
-        <dt>Nearest train station</dt><dd>${formatNumber(p.nearest_train_stop_m, " m")}</dd>
-        <dt>Score</dt><dd>${formatNumber(getScore(p).toFixed(1))}</dd>
-        <dt>Status</dt><dd>${candidate ? "Medical access difficulty candidate" : "Normal"}</dd>
+        <dt>${t("meshId")}</dt><dd>${p.mesh_id ?? "N/A"}</dd>
+        <dt>${t("population")}</dt><dd>${formatNumber(p.population)}</dd>
+        <dt>${t("elderlyRate")}</dt><dd>${formatNumber(p.elderly_rate, "%")}</dd>
+        <dt>${t("nearestMedical")}</dt><dd>${formatNumber(getMedicalDistance(p, controls.hospitalField), " m")}</dd>
+        <dt>${t("nearest1ji")}</dt><dd>${formatNumber(p.nearest_1ji_hospital_m, " m")}</dd>
+        <dt>${t("nearest2ji")}</dt><dd>${formatNumber(p.nearest_2ji_hospital_m, " m")}</dd>
+        <dt>${t("nearest3ji")}</dt><dd>${formatNumber(p.nearest_3ji_hospital_m, " m")}</dd>
+        <dt>${t("nearestBusStop")}</dt><dd>${formatNumber(p.nearest_bus_stop_m, " m")}</dd>
+        <dt>${t("nearestTrainStation")}</dt><dd>${formatNumber(p.nearest_train_stop_m, " m")}</dd>
+        <dt>${t("accessPriority")}</dt><dd>${formatNumber(getScore(p))}</dd>
+        <dt>${t("status")}</dt><dd>${candidate ? t("medicalAccessDifficultyCandidate") : t("normal")}</dd>
       </dl>
     </div>
   `;
@@ -382,11 +489,52 @@ function stopModeLabel(mode, t) {
   return labels[mode] || mode.replaceAll("_", " ");
 }
 
+function createTriangle(latlng, sizeMeters = 300) {
+  const lat = latlng.lat;
+  const lng = latlng.lng;
+
+  // Convert meters to degrees (approximation)
+  const dLat = sizeMeters / 111320;
+  const dLng = sizeMeters / (111320 * Math.cos(lat * Math.PI / 180));
+
+  return [
+    [lat + dLat, lng],         // top
+    [lat - dLat, lng - dLng],  // bottom left
+    [lat - dLat, lng + dLng],  // bottom right
+  ];
+}
+
+const STOP_STYLE_RULES = [
+  {
+    key: "tram_light_rail",
+    labelKey: "tramLightRail",
+    color: "#7c3aed",
+    fillColor: "#a78bfa",
+  },
+  {
+    key: "rail_train",
+    labelKey: "railTrain",
+    color: "#0f766e",
+    fillColor: "#2dd4bf",
+  },
+  {
+    key: "bus",
+    labelKey: "bus",
+    color: "#1d4ed8",
+    fillColor: "#60a5fa",
+  },
+];
+
 function stopColor(feature) {
   const modes = stopModes(feature);
-  if (modes.includes("tram_light_rail")) return { color: "#7c3aed", fillColor: "#a78bfa", radius: 5 };
-  if (modes.includes("rail") || modes.includes("train")) return { color: "#0f766e", fillColor: "#2dd4bf", radius: 5 };
-  return { color: "#1d4ed8", fillColor: "#60a5fa", radius: 4 };
+
+  if (modes.includes("tram_light_rail")) {
+    return STOP_STYLE_RULES[0];
+  }
+  if (modes.includes("rail") || modes.includes("train")) {
+    return STOP_STYLE_RULES[1];
+  }
+  return STOP_STYLE_RULES[2];
 }
 
 function stopMatchesFilters(feature, visibility) {
@@ -434,6 +582,63 @@ function Range({ label, value, min, max, step = 1, suffix = "", onChange }) {
   );
 }
 
+function meshOverlapsActiveBuffer(properties, controls) {
+  if (!controls.showMedicalBuffers && !controls.showTransportBuffers) {
+    return false;
+  }
+
+  if (controls.showMedicalBuffers) {
+    const medicalDistance = getMedicalDistance(properties, controls.hospitalField);
+
+    if (medicalDistance !== null && medicalDistance <= controls.medicalRadiusM) {
+      return true;
+    }
+  }
+
+  if (controls.showTransportBuffers) {
+    const busDistance = getMeters(properties, "nearest_bus_stop_m");
+    const trainDistance = getMeters(properties, "nearest_train_stop_m");
+
+    if (controls.mergePublicTransport) {
+      const nearestTransport = Math.min(busDistance ?? Infinity, trainDistance ?? Infinity);
+
+      if (nearestTransport <= controls.publicTransportRadiusM) {
+        return true;
+      }
+    } else {
+      if (busDistance !== null && busDistance <= controls.busRadiusM) {
+        return true;
+      }
+
+      if (trainDistance !== null && trainDistance <= controls.trainRadiusM) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+function getMeshFillOpacity(properties, controls) {
+  const normalOpacity = 0.7;//controls.meshOpacity / 100;
+
+  const hasActiveBuffers = controls.showMedicalBuffers || controls.showTransportBuffers;
+
+  if (!hasActiveBuffers) {
+    return normalOpacity;
+  }
+
+  const overlapsBuffer = meshOverlapsActiveBuffer(properties, controls);
+
+  // Inside buffer = more transparent so buffer underneath is visible.
+  // Outside buffer = more opaque so difference is easy to notice.
+  if (overlapsBuffer) {
+    return Math.min(normalOpacity, 0.25);
+  }
+
+  return Math.max(normalOpacity, 0.72);
+}
+
 function App() {
   const mapRef = useRef(null);
   const layersRef = useRef({});
@@ -457,15 +662,22 @@ function App() {
     mapRef.current = map;
 
     [
-      ["bufferPane", 540],
+      //["medicalPane", 540],
+      //["meshPane", 520],
+      //["bufferPane", 500],
+      //["stopPane", 480],
+      //["stationPane", 450],
+      ["medicalPane", 560],
+      ["stopPane", 555],
+      ["bufferStrokePane", 550],
       ["meshPane", 520],
-      ["stopPane", 500],
-      ["medicalPane", 480],
+      ["bufferFillPane", 500],
       ["stationPane", 450],
     ].forEach(([name, zIndex]) => {
       map.createPane(name);
       map.getPane(name).style.zIndex = zIndex;
     });
+    map.getPane("bufferFillPane").style.opacity = 0.6;//initialControls.bufferOpacity / 100;
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -550,6 +762,11 @@ function App() {
     const frameId = window.requestAnimationFrame(() => {
       Object.values(layersRef.current).forEach((layer) => layer.remove());
       Object.values(bufferRef.current).forEach((group) => group.remove());
+      
+      if (map.getPane("bufferFillPane")) {
+          map.getPane("bufferFillPane").style.opacity = 0.6;//appliedControls.bufferOpacity / 100;
+      }
+
       layersRef.current = {};
       bufferRef.current = {};
 
@@ -602,15 +819,14 @@ function App() {
 
             return {
               pane: "meshPane",
-              color: candidate ? "#991b1b" : "#374151",
+              stroke: false,
               fillColor: meshColor(feature.properties, appliedControls),
-              fillOpacity: appliedControls.meshOpacity / 100,
-              opacity: Math.min(1, appliedControls.meshOpacity / 100 + 0.24),
-              weight: candidate ? 2 : 1,
+              fillOpacity: getMeshFillOpacity(feature.properties, appliedControls),
+              opacity: 1,
             };
           },
           onEachFeature: (feature, layer) =>
-            layer.bindPopup(() => meshPopup(feature, appliedControls)),
+            layer.bindPopup(() => meshPopup(feature, appliedControls, t)),
         }).addTo(map);
       }
 
@@ -657,9 +873,9 @@ function App() {
         layersRef.current.busStops = L.geoJSON(filteredBusStops, {
           pointToLayer: (feature, latlng) => {
             const colors = stopColor(feature);
-            return L.circleMarker(latlng, {
+            return L.polygon(createTriangle(latlng, STOPS_MARKER_RADIUS_M), {
               pane: "stopPane",
-              radius: colors.radius,
+              // radius: STOPS_MARKER_RADIUS_M,
               color: colors.color,
               fillColor: colors.fillColor,
               fillOpacity: appliedControls.pointOpacity / 100,
@@ -673,18 +889,32 @@ function App() {
 
       if (appliedControls.showMedicalBuffers && data.hospitals) {
         const group = L.layerGroup();
+
         L.geoJSON(data.hospitals, {
-          pointToLayer: (_feature, latlng) =>
+          pointToLayer: (_feature, latlng) => {
+            // Fill layer: opacity handled by the whole pane
             L.circle(latlng, {
-              pane: "bufferPane",
+              pane: "bufferFillPane",
+              radius: appliedControls.medicalRadiusM,
+              stroke: false,
+              fillColor: "#1142e2",
+              fillOpacity: 1,
+              interactive: false,
+            }).addTo(group);
+
+            // Border layer: always full opacity
+            return L.circle(latlng, {
+              pane: "bufferStrokePane",
               radius: appliedControls.medicalRadiusM,
               color: "#dc2626",
-              fillColor: "#fecaca",
-              fillOpacity: appliedControls.bufferOpacity / 100,
-              opacity: Math.min(1, 0.3),//appliedControls.bufferOpacity / 100 + 0.18),
-              weight: 1,
-            }).addTo(group),
+              opacity: 0,
+              fill: false,
+              weight: 1.5,
+              interactive: false,
+            }).addTo(group);
+          },
         });
+
         group.addTo(map);
         bufferRef.current.medical = group;
       }
@@ -696,31 +926,52 @@ function App() {
 
         if (data.stations) {
           L.geoJSON(data.stations, {
-            pointToLayer: (_feature, latlng) =>
+            pointToLayer: (_feature, latlng) =>{
+            // Fill
             L.circle(latlng, {
-                pane: "bufferPane",
-                radius: trainRadius,
-                color: "#0f766e",
-                fillColor: "#ccfbf1",
-                fillOpacity: appliedControls.bufferOpacity / 100,
-                opacity: Math.min(1, 0.3),//appliedControls.bufferOpacity / 100 + 0.18),
-                weight: 1,
-              }).addTo(group),
-          });
+              pane: "bufferFillPane",
+              radius: trainRadius,
+              stroke: false,
+              fillColor: "#0be7b8",
+              fillOpacity: 1,
+              interactive: false,
+            }).addTo(group);
+
+            // Border
+            return L.circle(latlng, {
+              pane: "bufferStrokePane",
+              radius: trainRadius,
+              color: "#0f766e",
+              opacity: 0,
+              fill: false,
+              weight: 1.5,
+              interactive: false,
+            }).addTo(group);
+          }});
         }
 
         if (filteredBusStops) {
           L.geoJSON(filteredBusStops, {
-            pointToLayer: (_feature, latlng) =>
-            L.circle(latlng, {
-                pane: "bufferPane",
+            pointToLayer: (_feature, latlng) => {
+              L.circle(latlng, {
+                pane: "bufferFillPane",
+                radius: busRadius,
+                stroke: false,
+                fillColor: "#0c76f8",
+                fillOpacity: 1,
+                interactive: false,
+              }).addTo(group);
+
+              return L.circle(latlng, {
+                pane: "bufferStrokePane",
                 radius: busRadius,
                 color: "#2563eb",
-                fillColor: "#bfdbfe",
-                fillOpacity: appliedControls.bufferOpacity / 100,
-                opacity: Math.min(1, appliedControls.bufferOpacity / 100 + 0.18),
-                weight: 1,
-              }).addTo(group),
+                opacity: 0,
+                fill: false,
+                weight: 1.5,
+                interactive: false,
+              }).addTo(group);
+            },
           });
         }
 
@@ -752,11 +1003,11 @@ function App() {
                 value={controls.scoreThreshold}
                 onChange={(event) => updateControl("scoreThreshold", Number(event.target.value))}
               >
-                <option value={-1}>絞らない</option>
-                <option value={0}>アクセス良好地域</option>
-                <option value={2}>要観察地域</option>
-                <option value={3}>優先対応地域</option>
-                <option value={4}>最優先対応地域</option>
+                <option value={-1}>{t("noFilter")}</option>
+                <option value={0}>{t("scoreGoodAccess")}</option>
+                <option value={2}>{t("scoreWatchArea")}</option>
+                <option value={3}>{t("scoreHighPriority")}</option>
+                <option value={4}>{t("scoreVeryHighPriority")}</option>
               </select>
             </label>
           <div className="stat-card">
@@ -880,7 +1131,7 @@ function App() {
             </div>
           </div>
         )}
-        if (controls.)
+        {/* if (controls.) */}
         {/* <div className="legend">
           {meshLegendItems.map((item) => item.label && (
             <span key={item.label}>
@@ -892,55 +1143,63 @@ function App() {
         </div> */}
 
         <div className="legend">
-          <div className="legend-section">
+          {appliedControls.showMesh&&(<div className="legend-section">
             <strong className="legend-title">
-              {appliedControls.showCandidates ? "Score" : controls.colorMode === "population" ? "Population" : "Elderly rate"}
+              {appliedControls.showCandidates ? t("accessPriority") : controls.colorMode === "population" ? t("population"): t("elderlyRate")}
             </strong>
 
-            {meshLegendItems.map((item) => item.label && (
-              <span key={item.label} className="legend-item">
+            {meshLegendItems.map((item) => (
+              <span key={item.key || item.labelKey} className="legend-item">
                 <i
                   className="legend-square"
                   style={{ backgroundColor: item.color }}
                 />
-                {item.label}
+                {t(item.labelKey)}
               </span>
             ))}
-          </div>
+          </div>)}
 
           {appliedControls.showHospitals && (
             <div className="legend-section">
-              <strong className="legend-title">Hospitals</strong>
-
-              {Object.entries(HOSPITAL_TYPE_STYLES).map(([type, item]) => (
-                <span key={`hospital-${type}`} className="legend-item">
-                  <i
-                    className="legend-circle"
-                    style={{
-                      backgroundColor: item.fillColor,
-                      borderColor: item.color,
-                    }}
-                  />
-                  {item.label}
-                </span>
-              ))}
+              <strong className="legend-title">{t("hospitals")}</strong>              
+                {Object.entries(HOSPITAL_TYPE_STYLES).map(([type, item]) => (
+                  <span key={`hospital-${type}`} className="legend-item">
+                    <i
+                      className="legend-circle"
+                      style={{
+                        backgroundColor: item.fillColor,
+                        borderColor: item.color,
+                      }}
+                    />
+                    {t(item.labelKey)}
+                  </span>
+                ))}
             </div>
           )}
 
           {(appliedControls.showStations || appliedControls.showBusStops) && (
-            <div className="legend-section">
-              <strong className="legend-title">Transport</strong>
+  <div className="legend-section">
+    <strong className="legend-title">{t("transport")}</strong>
 
-              <span className="legend-item">
-                <i className="transport" /> {t("transport")}
-              </span>
-            </div>
-          )}
+    
+      {STOP_STYLE_RULES
+        .filter((item) => appliedControls.stopModeVisibility[item.key] !== false)
+        .map((item) => (
+          <span key={item.key} className="legend-item">
+            <i
+              className="legend-triangle"
+              style={{
+                borderBottomColor: item.fillColor,
+              }}
+            />
+            {t(item.labelKey)}
+          </span>
+        ))}
+
+      </div>
+    )}
         </div>
-        {/* <div>
-          <span><i className="transport" /> {t("transport")}</span>
-          <span><i className="medical" /> {t("medical")}</span>
-        </div> */}
+        
       </main>
     </div>
   );

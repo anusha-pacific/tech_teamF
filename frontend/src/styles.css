@@ -362,6 +362,15 @@ select {
   border-style: solid;
 }
 
+.legend .legend-triangle {
+  width: 0;
+  height: 0;
+  border-left: 7px solid transparent;
+  border-right: 7px solid transparent;
+  border-bottom: 14px solid; /* fill color */
+  display: inline-block;
+}
+
 /* Optional transport icon */
 .legend .transport {
   border-radius: 50%;
