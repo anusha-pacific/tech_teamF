@@ -250,7 +250,7 @@ const HOSPITAL_TYPE_STYLES = {
 
 
 function getHospitalTypeStyle(properties) {
-  const type = String(properties?.P04_001 ?? "").trim();
+  const type = String(properties?.type_ji ?? "").trim();
 
   return (
     HOSPITAL_TYPE_STYLES[type] || {
@@ -279,12 +279,25 @@ function getMeters(properties, field) {
   return Number.isNaN(numeric) ? null : numeric;
 }
 
+function minValidMeters(properties, fields) {
+  const values = fields
+    .map((field) => getMeters(properties, field))
+    .filter((value) => value !== null && value !== undefined && !Number.isNaN(value));
+
+  return values.length > 0 ? Math.min(...values) : null;
+}
+
 function getMedicalDistance(properties, hospitalField) {
-  return (
-    getMeters(properties, hospitalField) ??
-    getMeters(properties, "nearest_medical_m") ??
-    getMeters(properties, "nearest_1ji_hospital_m")
-  );
+  if (hospitalField === "nearest_medical_m") {
+    return minValidMeters(properties, [
+      "1_nearest_1次_mesh_to_hospital_straight_distance_m",
+      "1_nearest_2次_mesh_to_hospital_straight_distance_m",
+      "1_nearest_2.5次_mesh_to_hospital_straight_distance_m",
+      "1_nearest_3次_mesh_to_hospital_straight_distance_m",
+    ]);
+  }
+
+  return getMeters(properties, hospitalField);
 }
 
 function getScore(properties) {
@@ -552,6 +565,28 @@ function ControlGroup({ icon: Icon, title, children }) {
       {children}
     </section>
   );
+}
+
+function selectedHospitalTypeFromField(hospitalField) {
+  const fieldToType = {
+    "1_nearest_1次_mesh_to_hospital_straight_distance_m": "1",
+    "1_nearest_2次_mesh_to_hospital_straight_distance_m": "2",
+    "1_nearest_2.5次_mesh_to_hospital_straight_distance_m": "2.5",
+    "1_nearest_3次_mesh_to_hospital_straight_distance_m": "3",
+  };
+
+  return fieldToType[hospitalField] || null;
+}
+
+function hospitalMatchesSelectedField(feature, hospitalField) {
+  const selectedType = selectedHospitalTypeFromField(hospitalField);
+
+  // nearest_medical_m means all hospitals
+  if (!selectedType) return true;
+
+  const hospitalType = String(feature.properties?.type_ji ?? "0").trim();
+
+  return hospitalType === selectedType;
 }
 
 function Checkbox({ label, checked, onChange }) {
@@ -889,8 +924,16 @@ function App() {
 
       if (appliedControls.showMedicalBuffers && data.hospitals) {
         const group = L.layerGroup();
+        
+        const filteredHospitalsForBuffer = {
+            ...data.hospitals,
+            features: data.hospitals.features.filter((feature) =>
+              hospitalMatchesSelectedField(feature, appliedControls.hospitalField)
+            ),
+          };
 
-        L.geoJSON(data.hospitals, {
+
+        L.geoJSON(filteredHospitalsForBuffer, {
           pointToLayer: (_feature, latlng) => {
             // Fill layer: opacity handled by the whole pane
             L.circle(latlng, {
@@ -1043,10 +1086,10 @@ function App() {
             {t("medicalDistanceField")}
             <select value={controls.hospitalField} onChange={(event) => updateControl("hospitalField", event.target.value)}>
               <option value="nearest_medical_m">{t("nearestMedical")}</option>
-              <option value="nearest_1ji_hospital_m">{t("nearest1ji")}</option>
-              <option value="nearest_2ji_hospital_m">{t("nearest2ji")}</option>
-              <option value="nearest_2_5ji_hospital_m">{t("nearest25ji")}</option>
-              <option value="nearest_3ji_hospital_m">{t("nearest3ji")}</option>
+              <option value="1_nearest_1次_mesh_to_hospital_straight_distance_m">{t("nearest1ji")}</option>
+              <option value="1_nearest_2次_mesh_to_hospital_straight_distance_m">{t("nearest2ji")}</option>
+              <option value="1_nearest_2.5次_mesh_to_hospital_straight_distance_m">{t("nearest25ji")}</option>
+              <option value="1_nearest_3次_mesh_to_hospital_straight_distance_m">{t("nearest3ji")}</option>
             </select>
           </label>
           <Range
