@@ -10,12 +10,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:5000
 const initialControls = {
   colorMode: "elderly",
   showMesh: true,
-<<<<<<< HEAD
   // showHospitals: true,
   hospitalVisibilityMode: "all",
-=======
-  showHospitals: true,
->>>>>>> origin/master
   showStations: false,
   showBusStops: false,
   showMedicalBuffers: false,
@@ -122,7 +118,6 @@ const messages = {
     tertiaryHospital: "Tertiary hospital",
     unknownHospitalType: "Unknown hospital type",
 
-<<<<<<< HEAD
     hospitalDisplay: "Hospital display",
     showAllHospitals: "Show all hospitals",
     showNoHospitals: "Show none",
@@ -132,8 +127,6 @@ const messages = {
     show25jiHospitals: "Show 2.5ji hospitals",
     show3jiHospitals: "Show 3ji hospitals",
 
-=======
->>>>>>> origin/master
     scoreVeryHighPriority: "Highest-priority support area",
     scoreHighPriority: "Priority support area",
     scoreWatchArea: "Monitoring area",
@@ -152,10 +145,7 @@ const messages = {
     noPopulation: "No population",
 
     railTrain: "Rail / Train",
-<<<<<<< HEAD
 
-=======
->>>>>>> origin/master
   },
   ja: {
     appEyebrow: "Team F ダッシュボード",
@@ -224,7 +214,6 @@ const messages = {
     level25Hospital: "2.5次医療施設",
     tertiaryHospital: "三次医療施設",
     unknownHospitalType: "医療施設種別不明",
-<<<<<<< HEAD
     hospitalDisplay: "医療施設の表示",
     showAllHospitals: "すべて表示",
     showNoHospitals: "表示しない",
@@ -233,8 +222,6 @@ const messages = {
     show2jiHospitals: "2次医療施設を表示",
     show25jiHospitals: "2.5次医療施設を表示",
     show3jiHospitals: "3次医療施設を表示",
-=======
->>>>>>> origin/master
 
     scoreVeryHighPriority: "最優先対応地域",
     scoreHighPriority: "優先対応地域",
@@ -280,7 +267,6 @@ const HOSPITAL_TYPE_STYLES = {
   },
 };
 
-<<<<<<< HEAD
 function hospitalType(feature) {
   return String(feature.properties?.type_ji ?? "0").trim();
 }
@@ -296,11 +282,6 @@ function hospitalMatchesVisibilityMode(feature, mode) {
 
 function getHospitalTypeStyle(properties) {
   const type = String(properties?.type_ji ?? "").trim();
-=======
-
-function getHospitalTypeStyle(properties) {
-  const type = String(properties?.P04_001 ?? "").trim();
->>>>>>> origin/master
 
   return (
     HOSPITAL_TYPE_STYLES[type] || {
@@ -329,7 +310,6 @@ function getMeters(properties, field) {
   return Number.isNaN(numeric) ? null : numeric;
 }
 
-<<<<<<< HEAD
 function minValidMeters(properties, fields) {
   const values = fields
     .map((field) => getMeters(properties, field))
@@ -349,14 +329,6 @@ function getMedicalDistance(properties, hospitalField) {
   }
 
   return getMeters(properties, hospitalField);
-=======
-function getMedicalDistance(properties, hospitalField) {
-  return (
-    getMeters(properties, hospitalField) ??
-    getMeters(properties, "nearest_medical_m") ??
-    getMeters(properties, "nearest_1ji_hospital_m")
-  );
->>>>>>> origin/master
 }
 
 function getScore(properties) {
@@ -529,7 +501,6 @@ function meshPopup(feature, controls, t) {
 
 function pointPopup(feature, fallbackTitle) {
   const p = feature.properties || {};
-<<<<<<< HEAD
 
   const title =
     p.name ||
@@ -544,20 +515,12 @@ function pointPopup(feature, fallbackTitle) {
 
   const rows = Object.entries(p)
     .filter(([key, value]) => value !== null && value !== undefined && value !== "" && !exclude_field.includes(key))
-=======
-  const rows = Object.entries(p)
-    .filter(([, value]) => value !== null && value !== undefined && value !== "")
->>>>>>> origin/master
     .map(([key, value]) => `<dt>${key}</dt><dd>${value}</dd>`)
     .join("");
 
   return `
     <div class="map-popup">
-<<<<<<< HEAD
       <h3>${title}</h3>
-=======
-      <h3>${p.name || p.stop_name || fallbackTitle}</h3>
->>>>>>> origin/master
       <dl>${rows || "<dt>Info</dt><dd>No properties available</dd>"}</dl>
     </div>
   `;
@@ -647,7 +610,6 @@ function ControlGroup({ icon: Icon, title, children }) {
   );
 }
 
-<<<<<<< HEAD
 function selectedHospitalTypeFromField(hospitalField) {
   const fieldToType = {
     "1_nearest_1次_mesh_to_hospital_straight_distance_m": "1",
@@ -670,8 +632,6 @@ function hospitalMatchesSelectedField(feature, hospitalField) {
   return hospitalType === selectedType;
 }
 
-=======
->>>>>>> origin/master
 function Checkbox({ label, checked, onChange }) {
   return (
     <label className="check-row">
@@ -737,7 +697,6 @@ function meshOverlapsActiveBuffer(properties, controls) {
   return false;
 }
 
-<<<<<<< HEAD
 function getHospitalType(properties) {
   return String(properties?.type_ji ?? "0").trim();
 }
@@ -780,8 +739,6 @@ function getHospitalMarkerRadius(properties) {
   return baseRadius * 0.85;
 }
 
-=======
->>>>>>> origin/master
 function getMeshFillOpacity(properties, controls) {
   const normalOpacity = 0.7;//controls.meshOpacity / 100;
 
@@ -814,7 +771,6 @@ function App() {
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState("");
   const t = useMemo(() => createTranslator(language), [language]);
-<<<<<<< HEAD
   const filteredHospitals = useMemo(() => {
     if (!data.hospitals) return null;
 
@@ -828,8 +784,6 @@ function App() {
       ),
     };
   }, [data.hospitals, appliedControls.hospitalVisibilityMode]);
-=======
->>>>>>> origin/master
 
   const updateControl = useCallback((key, value) => {
     setProcessing(true);
@@ -841,18 +795,9 @@ function App() {
     mapRef.current = map;
 
     [
-<<<<<<< HEAD
       ["hospitalHighPane", 580],     // 2ji, 2.5ji, 3ji
       ["hospitalPrimaryPane", 570],  // 1ji
       ["hospitalGeneralPane", 560],  // type_ji 0 / unknown
-=======
-      //["medicalPane", 540],
-      //["meshPane", 520],
-      //["bufferPane", 500],
-      //["stopPane", 480],
-      //["stationPane", 450],
-      ["medicalPane", 560],
->>>>>>> origin/master
       ["stopPane", 555],
       ["bufferStrokePane", 550],
       ["meshPane", 520],
@@ -1018,37 +963,23 @@ function App() {
       
       
 
-<<<<<<< HEAD
       
       if (filteredHospitals && filteredHospitals.features.length > 0) {
         layersRef.current.hospitals = L.geoJSON(filteredHospitals, {
 
-=======
-      if (appliedControls.showHospitals && data.hospitals) {
-        layersRef.current.hospitals = L.geoJSON(data.hospitals, {
->>>>>>> origin/master
           pointToLayer: (feature, latlng) => {
             const hospitalStyle = getHospitalTypeStyle(feature.properties);
 
             return L.circle(latlng, {
-<<<<<<< HEAD
 
               pane: getHospitalPane(feature.properties),
               radius: getHospitalMarkerRadius(feature.properties),
 
-=======
-              pane: "medicalPane",
-              radius: HOSPITAL_MARKER_RADIUS_M/2,
->>>>>>> origin/master
               color: hospitalStyle.color,
               fillColor: hospitalStyle.fillColor,
               fillOpacity: appliedControls.pointOpacity / 100,
               opacity: Math.min(1, appliedControls.pointOpacity / 100 + 0.12),
-<<<<<<< HEAD
               weight: getHospitalType(feature.properties) === "1" ? 2 : 3,
-=======
-              weight: 2,
->>>>>>> origin/master
             });
           },
           onEachFeature: (feature, layer) =>
@@ -1092,7 +1023,6 @@ function App() {
 
       if (appliedControls.showMedicalBuffers && data.hospitals) {
         const group = L.layerGroup();
-<<<<<<< HEAD
         
         const filteredHospitalsForBuffer = {
             ...data.hospitals,
@@ -1103,10 +1033,6 @@ function App() {
 
 
         L.geoJSON(filteredHospitalsForBuffer, {
-=======
-
-        L.geoJSON(data.hospitals, {
->>>>>>> origin/master
           pointToLayer: (_feature, latlng) => {
             // Fill layer: opacity handled by the whole pane
             L.circle(latlng, {
@@ -1199,11 +1125,7 @@ function App() {
     });
 
     return () => window.cancelAnimationFrame(frameId);
-<<<<<<< HEAD
   }, [data, appliedControls, filteredBusStops, filteredHospitals, t]);
-=======
-  }, [data, appliedControls, filteredBusStops]);
->>>>>>> origin/master
 
   return (
     <div className="dashboard">
@@ -1257,7 +1179,6 @@ function App() {
         </ControlGroup>
 
         <ControlGroup icon={Hospital} title={t("medical")}>
-<<<<<<< HEAD
           <label className="select-row">
             {t("hospitalDisplay")}
             <select
@@ -1275,25 +1196,15 @@ function App() {
               <option value="3">{t("show3jiHospitals")}</option>
             </select>
           </label>
-=======
-          <Checkbox label={t("showHospitals")} checked={controls.showHospitals} onChange={(value) => updateControl("showHospitals", value)} />
->>>>>>> origin/master
           <Checkbox label={t("showMedicalBuffer")} checked={controls.showMedicalBuffers} onChange={(value) => updateControl("showMedicalBuffers", value)} />
           <label className="select-row">
             {t("medicalDistanceField")}
             <select value={controls.hospitalField} onChange={(event) => updateControl("hospitalField", event.target.value)}>
               <option value="nearest_medical_m">{t("nearestMedical")}</option>
-<<<<<<< HEAD
               <option value="1_nearest_1次_mesh_to_hospital_straight_distance_m">{t("nearest1ji")}</option>
               <option value="1_nearest_2次_mesh_to_hospital_straight_distance_m">{t("nearest2ji")}</option>
               <option value="1_nearest_2.5次_mesh_to_hospital_straight_distance_m">{t("nearest25ji")}</option>
               <option value="1_nearest_3次_mesh_to_hospital_straight_distance_m">{t("nearest3ji")}</option>
-=======
-              <option value="nearest_1ji_hospital_m">{t("nearest1ji")}</option>
-              <option value="nearest_2ji_hospital_m">{t("nearest2ji")}</option>
-              <option value="nearest_2_5ji_hospital_m">{t("nearest25ji")}</option>
-              <option value="nearest_3ji_hospital_m">{t("nearest3ji")}</option>
->>>>>>> origin/master
             </select>
           </label>
           <Range
@@ -1406,7 +1317,6 @@ function App() {
             ))}
           </div>)}
 
-<<<<<<< HEAD
           {appliedControls.hospitalVisibilityMode !== "none" && (
             <div className="legend-section">
               <strong className="legend-title">{t("hospitals")}</strong>              
@@ -1427,23 +1337,6 @@ function App() {
                       {t(item.labelKey)}
                     </span>
                   ))}
-=======
-          {appliedControls.showHospitals && (
-            <div className="legend-section">
-              <strong className="legend-title">{t("hospitals")}</strong>              
-                {Object.entries(HOSPITAL_TYPE_STYLES).map(([type, item]) => (
-                  <span key={`hospital-${type}`} className="legend-item">
-                    <i
-                      className="legend-circle"
-                      style={{
-                        backgroundColor: item.fillColor,
-                        borderColor: item.color,
-                      }}
-                    />
-                    {t(item.labelKey)}
-                  </span>
-                ))}
->>>>>>> origin/master
             </div>
           )}
 
