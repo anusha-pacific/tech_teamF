@@ -132,6 +132,8 @@ const messages = {
     scoreWatchArea: "Monitoring area",
     scoreGoodAccess: "Good access area",
 
+    elderlyRate85: "65+ rate ≥ 85%",
+    elderlyRate65: "65+ rate ≥ 65%",
     elderlyRate45: "65+ rate ≥ 45%",
     elderlyRate35: "65+ rate ≥ 35%",
     elderlyRate25: "65+ rate ≥ 25%",
@@ -143,6 +145,10 @@ const messages = {
     population250: "Population > 250",
     populationPositive: "Population > 0",
     noPopulation: "No population",
+    population600Plus: "Population ≥ 600",
+    population100To600: "Population 100–599",
+    population50To100: "Population 50–99",
+    population0To50: "Population 0-50",
 
     railTrain: "Rail / Train",
 
@@ -228,6 +234,8 @@ const messages = {
     scoreWatchArea: "要観察地域",
     scoreGoodAccess: "アクセス良好地域",
 
+    elderlyRate85: "65歳以上割合 ≥ 85%",
+    elderlyRate65: "65歳以上割合 ≥ 65%",
     elderlyRate45: "65歳以上割合 ≥ 45%",
     elderlyRate35: "65歳以上割合 ≥ 35%",
     elderlyRate25: "65歳以上割合 ≥ 25%",
@@ -239,6 +247,10 @@ const messages = {
     population250: "人口 > 250",
     populationPositive: "人口 > 0",
     noPopulation: "人口データなし",
+    population600Plus: "人口 600以上",
+    population100To600: "人口 100〜599",
+    population50To100: "人口 50〜99",
+    population0To50: "人口 0〜50",
 
     railTrain: "鉄道",
   },
@@ -394,18 +406,20 @@ const SCORE_LEGEND_ITEMS = [
 ];
 
 const ELDERLY_COLOR_RULES = [
-  { key: "elderly-45", color: "#7f1d1d", labelKey: "elderlyRate45" },
-  { key: "elderly-35", color: "#b91c1c", labelKey: "elderlyRate35" },
-  { key: "elderly-25", color: "#f59e0b", labelKey: "elderlyRate25" },
-  { key: "elderly-positive", color: "#fde68a", labelKey: "elderlyRatePositive" },
+  { key: "elderly-85", color: "#581845", labelKey: "elderlyRate85" },
+  { key: "elderly-65", color: "#900c3f", labelKey: "elderlyRate65" },
+  { key: "elderly-45", color: "#c70039", labelKey: "elderlyRate45" },
+  { key: "elderly-35", color: "#ff5733", labelKey: "elderlyRate35" },
+  { key: "elderly-25", color: "#ffc300", labelKey: "elderlyRate25" },
+  { key: "elderly-positive", color: "#fff3b0", labelKey: "elderlyRatePositive" },
   { key: "elderly-none", color: "#f3f4f6", labelKey: "noElderlyData" },
 ];
 
 const POPULATION_COLOR_RULES = [
-  { key: "population-800", color: "#7c2d12", labelKey: "population800" },
-  { key: "population-500", color: "#c2410c", labelKey: "population500" },
-  { key: "population-250", color: "#f97316", labelKey: "population250" },
-  { key: "population-positive", color: "#fdba74", labelKey: "populationPositive" },
+  { key: "population-600", color: "#7c2d12", labelKey: "population600Plus" },
+  { key: "population-100-600", color: "#c2410c", labelKey: "population100To600" },
+  { key: "population-50-100", color: "#f97316", labelKey: "population50To100" },
+  { key: "population-0-50", color: "#fdba74", labelKey: "population0To50" },
   { key: "population-none", color: "#f3f4f6", labelKey: "noPopulation" },
 ];
 
@@ -459,20 +473,50 @@ function meshColor(properties, controls) {
   }
 
   if (controls.colorMode === "population") {
-    const population = Number(properties?.population) || 0;
-    if (population > 800) return "#7c2d12";
-    if (population > 500) return "#c2410c";
-    if (population > 250) return "#f97316";
-    if (population > 0) return "#fdba74";
+    const rawPopulation =
+      properties?.population ??
+      properties?.["　人口（総数）"];
+
+    if (rawPopulation === null || rawPopulation === undefined || rawPopulation === "") {
+      return "#f3f4f6";
+    }
+
+    const population = Number(rawPopulation);
+
+    if (Number.isNaN(population)) {
+      return "#f3f4f6";
+    }
+
+    if (population >= 600) return "#7c2d12";
+    if (population >= 100) return "#c2410c";
+    if (population >= 50) return "#f97316";
+    if (population >= 0) return "#fdba74";
+
+    return "#f3f4f6";
+  }
+  
+
+  const rawElderlyRate =
+    properties?.elderly_rate ??
+    properties?.["高齢者割合人口（総数）（％）"];
+
+  if (rawElderlyRate === null || rawElderlyRate === undefined || rawElderlyRate === "") {
     return "#f3f4f6";
   }
 
-  const elderlyRate = Number(properties?.elderly_rate) || 0;
-  if (elderlyRate >= 45) return "#7f1d1d";
-  if (elderlyRate >= 35) return "#b91c1c";
-  if (elderlyRate >= 25) return "#f59e0b";
-  if (elderlyRate > 0) return "#fde68a";
-  return "#f3f4f6";
+  const elderlyRate = Number(rawElderlyRate);
+
+  if (Number.isNaN(elderlyRate)) {
+    return "#f3f4f6";
+  }
+
+  if (elderlyRate >= 85) return "#581845"; // very dark purple
+  if (elderlyRate >= 65) return "#900c3f"; // dark magenta/red
+  if (elderlyRate >= 45) return "#c70039"; // strong red
+  if (elderlyRate >= 35) return "#ff5733"; // orange-red
+  if (elderlyRate >= 25) return "#ffc300"; // yellow
+  if (elderlyRate > 0) return "#fff3b0";   // pale yellow
+  return "#f3f4f6";                         // no data
 }
 
 function meshPopup(feature, controls, t) {
@@ -791,7 +835,7 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const map = L.map("map", { zoomControl: false, preferCanvas: true }).setView(TOYAMA_VIEW.center, TOYAMA_VIEW.zoom);
+    const map = L.map("map", { zoomControl: false, preferCanvas: false }).setView(TOYAMA_VIEW.center, TOYAMA_VIEW.zoom);
     mapRef.current = map;
 
     [
@@ -808,6 +852,11 @@ function App() {
       map.getPane(name).style.zIndex = zIndex;
     });
     map.getPane("bufferFillPane").style.opacity = 0.6;//initialControls.bufferOpacity / 100;
+    map.getPane("hospitalPrimaryPane").style.opacity = 0.7;//initialControls.bufferOpacity / 100;
+    
+    map.getPane("bufferFillPane").style.pointerEvents = "none";
+    map.getPane("bufferStrokePane").style.pointerEvents = "none";
+
 
     L.control.zoom({ position: "bottomright" }).addTo(map);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
