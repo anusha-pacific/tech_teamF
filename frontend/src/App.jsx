@@ -1074,11 +1074,18 @@ function App() {
         const group = L.layerGroup();
         
         const filteredHospitalsForBuffer = {
-            ...data.hospitals,
-            features: data.hospitals.features.filter((feature) =>
+          ...data.hospitals,
+          features: data.hospitals.features
+            .filter((feature) =>
               hospitalMatchesSelectedField(feature, appliedControls.hospitalField)
+            )
+            .filter((feature) =>
+              hospitalMatchesVisibilityMode(
+                feature,
+                appliedControls.hospitalVisibilityMode
+              )
             ),
-          };
+        };
 
 
         L.geoJSON(filteredHospitalsForBuffer, {
